@@ -1,0 +1,76 @@
+.video{
+    border:1px solid #eee;
+}
+
+body{
+    padding:50px;
+    font-family: sans-serif;
+}
+
+.controls{
+    width:575px;
+    height:60px;
+}
+
+.buttons{
+    float:left;
+    width:175px;
+}
+
+input[type='button']{
+    width:50px;
+    height:50px;
+    margin:3px;
+    border:0px #fff solid;
+    box-shadow:0;
+    padding:0px;
+    background-color:#fff;
+    opacity: .5;
+    background-repeat:no-repeat;
+}
+
+input[type='button']:hover{
+    border:0px #aaa solid;
+    border-radius:25px;
+    opacity: .7;
+}
+
+input[type='button']:active{
+    border:0px #444 solid;
+    border-radius:25px;
+    opacity:1;
+}
+input[type='button']:focus{
+    border:0px #444 solid;
+    border-radius:25px;
+    opacity:1;
+}
+
+.pause{
+    background-image: url('http://web.mit.edu/lilis/www/videolec/pause.png');
+}
+
+.start{
+    background-image: url('http://web.mit.edu/lilis/www/videolec/play.png');
+}
+
+.stop{
+    background-image: url('http://web.mit.edu/lilis/www/videolec/stop.png');
+}
+
+.timeControls{
+    float:right;
+    width:375px;
+}
+
+#slider{
+    width:300px;
+    float:left;
+    margin-top:20px;
+    margin-left:10px;
+}
+
+.time{
+    margin-top:20px;
+    float:right;
+}

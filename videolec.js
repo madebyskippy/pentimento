@@ -147,29 +147,73 @@ var Grapher = function() {
         context.lineTo(x-penWidth,y+penWidth);
     }
     
+    var keyframes = {};
+    
     //CHANGE TO WORK WITH NEW DATA!!!!
     function oneFrame(current){
         var done=false;
-        for(var i=0; i<numStrokes; i++){
-			//var data = dataPoints[i];
+        
+        var keyframeTime = 0;
+        var keyframeID = String(parseInt(current/10)*10);
+        if(keyframes[keyframeID] !== undefined) {
+            context.drawImage(keyframes[keyframeID],0,0);
+            keyframeTime = parseInt(keyframeID);
+        }
+        
+        
+        for(var i=0; i<numStrokes; i++){ //for all strokes
             var data = dataArray.visuals[i].vertices;
+             
 			context.beginPath();
+            
+            var properties= dataArray.visuals[i].properties;
+            for(var k=0; k< properties.length; k++){ //for all properties of the stroke
+                var property=properties[k];
+                if (property.type == "basicProperty"){
+                    if (property.time < current) {
+                        var r=parseFloat(property.redFill) * 255;
+                        var g=parseFloat(property.greenFill) * 255;
+                        var b=parseFloat(property.blueFill) * 255;
+                        context.fillStyle="rgba("+r+","+g+
+                                          ","+b+","+property.alphaFill+")";
+                        
+                        
+                        r=parseFloat(property.red) * 255;
+                        g=parseFloat(property.green) * 255;
+                        b=parseFloat(property.blue) * 255;
+                        context.strokeStyle="rgba("+r+","+g+
+                                          ","+b+","+property.alpha+")";
+                        
+                        
+                        //TODO: USE THE THICKNESS
+                    }
+                    else break;
+                }
+            }
             context.lineWidth = xscale/8;
-//			context.moveTo((data[0][0]*xscale),ymax*yscale-data[0][1]*yscale);
-			
-			for (var j = 0; j < data.length; j++) {
+			for (var j = 0; j < data.length; j++) { //for all verticies
 				if (data[j].t < current){
 					var x=data[j].x*xscale
 					var y=data[j].y*yscale	
-//					context.lineTo(x,ymax*yscale-y);
                     calligraphize(context,x,ymax*yscale-y);
 				}else {
                     done=true;
 					break;}
 			}
+            
             context.fill();
             context.stroke();
             if (done) break;
+        }
+        
+        //saves a keyframe every 10 seconds
+        if(current % 10 < 1 & current >= 10) {
+            var newKeyframeID = String(parseInt(current));
+            if(keyframes[newKeyframeID] === undefined) {
+                var newKeyframe = new Image();
+                newKeyframe.src = c.toDataURL();
+                keyframes[newKeyframeID] = newKeyframe;
+            }
         }
     }
 /***************END CHANGES*******************/

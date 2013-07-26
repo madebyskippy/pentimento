@@ -194,7 +194,6 @@ var Grapher = function() {
                         
                         //TODO: USE THE THICKNESS
                     }
-                    else break;
                 }
             }
             context.lineWidth = xscale/8;
@@ -205,12 +204,13 @@ var Grapher = function() {
                     calligraphize(context,x,ymax*yscale-y);
 				}else {
                     done=true;
-					break;}
+					//break;
+                }
 			}
             
             context.fill();
             context.stroke();
-            if (done) break;
+            //if (done) break;
         }
     }
 /***************END CHANGES*******************/

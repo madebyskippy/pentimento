@@ -17,22 +17,41 @@ var Grapher = function() {
     var audio;
     var isAudio=true;
     
-    var lines = new Array();
-    var patterns = [/[numberofPrimitives=][0-9]+/ig, 
-                    /[numberofVertices=][0-9]+/ig, 
-                    /[0-9.]+/ig];
-    var dataPoints = new Array();
-    
     /*
-        how the json is organized:
-        array of stroke objects
-        stroke: {
-            verticies: [ {"x": 0, "y": 0, "t": 0, "pressure":0}, {} ...],
-            properties: [ {"type": "", "time": 0, "thickness":0, "color":0..., "colorfill": 0...}, {} ...]
-        }
-        length: 0 (length of total lecture in seconds)
-        height: 0
-        width: 0 (both of the lecture screen)
+        **********the dataArray object****************
+        durationInSeconds: number
+        height: number
+        width: number
+        cameraTransforms: [ { m11: number,
+                              m12: number,
+                              m21: number,
+                              m22: number,
+                              time: number,
+                              tx: number,
+                              ty: number,
+                            }, {} ...]
+        pageFlips: [ { page: number,
+                       time: number
+                     }, {} ...]
+        visuals: [ { doesItGetDeleted: boolean,
+                     tDeletion: number,
+                     tEndEdit: number,
+                     tMin: number,
+                     type: string ( "stroke" )
+                     properties: [ { alpha: number,
+                                     alphaFill: number, 
+                                     blue: number, 
+                                     blueFill: number, 
+                                     green: number, 
+                                     greenFill: number, 
+                                     red: number, 
+                                     redFill: number, 
+                                     thickness: number, 
+                                     time: number, 
+                                     type: string ( "basicProperty" )
+                                    }, {}...]
+                     verticies: [ {x: number, y: number, t: number, pressure: number}, {}...]
+                   }, {} ...]
     */
     
     var imax;	// maximum time value
@@ -146,7 +165,6 @@ var Grapher = function() {
         context.moveTo(x,y);
         context.lineTo(x-penWidth,y+penWidth);
     }
-    
     var keyframes = {};
     
     //CHANGE TO WORK WITH NEW DATA!!!!
@@ -159,7 +177,6 @@ var Grapher = function() {
             context.drawImage(keyframes[keyframeID],0,0);
             keyframeTime = parseInt(keyframeID);
         }
-        
         
         for(var i=0; i<numStrokes; i++){ //for all strokes
             var data = dataArray.visuals[i].vertices;
@@ -198,12 +215,13 @@ var Grapher = function() {
                     calligraphize(context,x,ymax*yscale-y);
 				}else {
                     done=true;
-					break;}
+					//break;
+                }
 			}
             
             context.fill();
             context.stroke();
-            if (done) break;
+            //if (done) break;
         }
         
         //saves a keyframe every 10 seconds
@@ -458,7 +476,7 @@ var Grapher = function() {
         else { resetControlSize(); }
     }
     
-    var template="<div class='lecture'>"
+    var template="<a href='index.html'>index</a><br><div class='lecture'>"
         + "<canvas class='video' style='cursor:crosshair;'></canvas>"
     //I MADE CHANGES 7/25
         + "<div class='zoomslider' style='display:inline-block;position:absolute;margin-left:10px;'>"

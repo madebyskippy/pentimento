@@ -157,8 +157,8 @@ var Grapher = function() {
     
 /*************I MADE CHANGES 7/24*****************/    
     //draw a parallelogram for each pair of points
-    function calligraphize(context, x, y) {
-        var penWidth = 4*xscale;
+    function calligraphize(context, x, y, pressure) {
+        var penWidth = 32*pressure*context.lineWidth;
         context.lineTo(x-penWidth,y+penWidth);
         context.lineTo(x,y);
         context.closePath();
@@ -173,7 +173,7 @@ var Grapher = function() {
         var keyframeTime = 0;
         var keyframeID = String(parseInt(current/10)*10);
         if(keyframes[keyframeID] !== undefined) {
-            context.drawImage(keyframes[keyframeID],0,0);
+            context.drawImage(keyframes[keyframeID],0,0,c.width,c.height);
             keyframeTime = parseInt(keyframeID);
         }
         
@@ -202,15 +202,17 @@ var Grapher = function() {
                         
                         
                         //TODO: USE THE THICKNESS
+                        context.lineWidth = property.thickness*xscale/80;
                     }
                 }
             }
-            context.lineWidth = xscale/8;
+//            context.lineWidth = xscale/8;
 			for (var j = 0; j < data.length; j++) { //for all verticies
 				if (data[j].t < current & data[j].t >= keyframeTime){
-					var x=data[j].x*xscale
-					var y=data[j].y*yscale	
-                    calligraphize(context,x,ymax*yscale-y);
+					var x=data[j].x*xscale;
+					var y=data[j].y*yscale;
+                    var pressure = data[j].pressure;
+                    calligraphize(context,x,ymax*yscale-y,pressure);
 				}
 			}
             

@@ -169,7 +169,6 @@ var Grapher = function() {
     
     //CHANGE TO WORK WITH NEW DATA!!!!
     function oneFrame(current){
-        var done=false;
         
         var keyframeTime = 0;
         var keyframeID = String(parseInt(current/10)*10);
@@ -187,7 +186,7 @@ var Grapher = function() {
             for(var k=0; k< properties.length; k++){ //for all properties of the stroke
                 var property=properties[k];
                 if (property.type == "basicProperty"){
-                    if (property.time < current) {
+                    if (property.time < current & property.time >= keyframeTime) {
                         var r=parseFloat(property.redFill) * 255;
                         var g=parseFloat(property.greenFill) * 255;
                         var b=parseFloat(property.blueFill) * 255;
@@ -204,24 +203,19 @@ var Grapher = function() {
                         
                         //TODO: USE THE THICKNESS
                     }
-                    else break;
                 }
             }
             context.lineWidth = xscale/8;
 			for (var j = 0; j < data.length; j++) { //for all verticies
-				if (data[j].t < current){
+				if (data[j].t < current & data[j].t >= keyframeTime){
 					var x=data[j].x*xscale
 					var y=data[j].y*yscale	
                     calligraphize(context,x,ymax*yscale-y);
-				}else {
-                    done=true;
-					//break;
-                }
+				}
 			}
             
             context.fill();
             context.stroke();
-            //if (done) break;
         }
         
         //saves a keyframe every 10 seconds

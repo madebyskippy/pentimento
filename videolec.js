@@ -15,23 +15,13 @@ var Grapher = function() {
     var totalZoom = 1;
     
     var audio;
+    var isAudio=true;
     
     var lines = new Array();
     var patterns = [/[numberofPrimitives=][0-9]+/ig, 
                     /[numberofVertices=][0-9]+/ig, 
                     /[0-9.]+/ig];
     var dataPoints = new Array();
-    /* array of strokes
-        stroke is an object:
-        { color: [color, time],[color, time] ... (color is a string)
-          width: [width, time],[width, time] ... (width is a number)
-          transform: time & transformation matrix
-          end: time exists if the stroke is deleted at any point in time
-          points: [x,y,t],[x,y,t],[x,y,t]... }
-          
-          (time is always number of seconds)
-        
-    */
     
     /*
         how the json is organized:
@@ -96,15 +86,16 @@ var Grapher = function() {
         var done=false;
         for(var i=0; i<numStrokes; i++){
             var currentStroke=dataArray.strokes[i];
-            for(var j=0;j<currentStroke.length; j++){
-                if (currentStroke[j][2]<currentI){
+            for(var j=0;j<currentStroke.vertices.length; j++){
+                if (currentStroke.vertices[j].t<currentI){
                     //check closeness of x,y to this current point
-                    var dist = getDistance(x,y,currentStroke[j][0],currentStroke[j][1])
+                    var dist = getDistance(x,y,currentStroke.vertices[j].x,
+                                           currentStroke.vertices[j].y)
                     if (dist<closestPoint.distance){
                         closestPoint.distance=dist;
                         closestPoint.stroke=i;
                         closestPoint.point=j;
-                        closestPoint.time=currentStroke[j][2];
+                        closestPoint.time=currentStroke.vertices[j].t;
                     }
                 }else{
                     done=true;
@@ -116,13 +107,14 @@ var Grapher = function() {
         
         console.log(closestPoint);
         if (closestPoint.stroke!= -1){ //it found a close enough point
-            var time=parseFloat(dataPoints[closestPoint.stroke][0][2]); //TODO: CHANGE TO NEW DATA ARRAY
+            //var time=parseFloat(dataPoints[closestPoint.stroke][0][2]); //TODO: CHANGE TO NEW DATA ARRAY
+            var time=parseFloat(dataArray.strokes[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
             context.clearRect(0,0,c.width,c.height);
             oneFrame(time);
             changeSlider(time);
-            audio.currentTime=time;
+            if (isAudio) audio.currentTime=time;
         }
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
@@ -204,7 +196,7 @@ var Grapher = function() {
 		context.clearRect(0,0,c.width,c.height);
         oneFrame(val);
         changeSlider(val);
-        audio.currentTime=val;
+        if (isAudio) audio.currentTime=val;
     }
     
     //triggered after a user stops sliding
@@ -280,7 +272,7 @@ var Grapher = function() {
         root.find('.time').html('0');
         
         audio.pause();
-        audio.currentTime=0;
+        if (isAudio) audio.currentTime=0;
         offsetTime=0;
     }
     
@@ -306,7 +298,7 @@ var Grapher = function() {
         context.clearRect(0,0,c.width,c.height);
         oneFrame(time);
         changeSlider(time);
-        audio.currentTime=time;
+        if (isAudio) audio.currentTime=time;
         
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
@@ -363,7 +355,7 @@ var Grapher = function() {
         context.clearRect(0,0,c.width,c.height);
         oneFrame(time);
         changeSlider(time);
-        audio.currentTime=time;
+        if (isAudio) audio.currentTime=time;
         
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
@@ -451,6 +443,7 @@ var Grapher = function() {
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
+        if (audioSource == '' ) isAudio=false;
         
         $('.buttons').append('<button class="jumpBack"> < 10s </button>');
         $('.buttons').append('<button class="jumpForward"> 10s > </button>');
@@ -497,19 +490,6 @@ var Grapher = function() {
         });
 /*********************END CHANGES****************/
         
-//        var windowWidth=$(window).width();
-//        var windowHeight=$(window).height();
-//        var videoDim;
-//        //fit canvas to window width
-//        if (windowWidth>(windowHeight+150)) { //take smaller of the two
-//            videoDim=(windowHeight-200);
-//            var scaleFactor=ymax;
-//        }
-//        else {
-//            videoDim=windowWidth-125;
-//            var scaleFactor=xmax;
-//        }
-//        console.log(windowWidth,windowHeight);
         
         c=root.find('.video')[0];
         
@@ -568,12 +548,6 @@ var Grapher = function() {
         context.save();
 /*********************END CHANGES***************/
         
-//        if (c.width<575) {
-//            resizeControls(c.width);
-//        }
-        
-//        yscale=(c.height)/ymax;
-//        xscale=(c.width)/xmax;
         readFile(datafile,getData); //dataPoints now filled with data
         
         root.find('.jumpForward').on('click',jumpForward);
@@ -625,49 +599,3 @@ var Grapher = function() {
         }, 50);
     }
 })();
-
-
-/*
-TODO:
--resize window, fill up browser size
-    -maintain stroke width
--minimize amount of things you have to put in the actual html
--reorganize data so that you have type of stroke in it
-    (so you can do color, highlight, etc)
-    
-    changes over time for each stroke, for lecture
-    color
-    stroke width
-    
-    background slides
-        -display pdf? images?
-        -pdf to svg and then display svgs
-    
-    user interacting drag -- richard is working on this
-        -pause it first
-        - animate it back to origional state (when it ppresses play)
-        - scroll bars to give people an idea of how big the canvas is?
-        -change mouse cursor to a hand to suggest you can drag
-        
-        - zoom while playing 
-        - zoom that follows stuff that's being written
-        
-    when you click a stroke and it jumps back to the time,
-        grey out all that's happened since then instead of just erasing
-        -maybe make the mouse crosshairs?
-        
-    set time skips (10s, 15s, one chapter, one slide, etc)
-        -done (unless bugs are found)
-    
-    caligraphic strokes -- richard is doing this 
-    
-    farthest point button  ( movable?)
-        -put marks in the timeline 
-    
-    full screen mode
-    
-CURRENT BUGS:
-    - jump forward/back buttons break before you press play
-
-*/
-

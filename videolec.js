@@ -157,14 +157,15 @@ var Grapher = function() {
     
 /*************I MADE CHANGES 7/24*****************/    
     //draw a parallelogram for each pair of points
-    function calligraphize(context, x, y, pressure) {
-        var penWidth = 32*pressure*context.lineWidth;
+    function calligraphize(ctx, x, y, pressure) {
+        var penWidth = 32*pressure*ctx.lineWidth;
         context.lineTo(x-penWidth,y+penWidth);
         context.lineTo(x,y);
         context.closePath();
         context.moveTo(x,y);
         context.lineTo(x-penWidth,y+penWidth);
     }
+    
     var keyframes = {};
     
     //CHANGE TO WORK WITH NEW DATA!!!!
@@ -172,52 +173,66 @@ var Grapher = function() {
         
         var keyframeTime = 0;
         var keyframeID = String(parseInt(current/10)*10);
-        if(keyframes[keyframeID] !== undefined) {
+        //COP-OUT SOLUTION FOR FUZZY ZOOMING: REDRAW ALL STROKES WHEN ZOOMED IN
+        if(keyframes[keyframeID] !== undefined & totalZoom <= 1) {
             context.drawImage(keyframes[keyframeID],0,0,c.width,c.height);
             keyframeTime = parseInt(keyframeID);
         }
         
+        var dynamicStrokes = [];
+        
         for(var i=0; i<numStrokes; i++){ //for all strokes
-            var data = dataArray.visuals[i].vertices;
-             
-			context.beginPath();
+            var currentStroke = dataArray.visuals[i];
+            var tmin = currentStroke.tMin;
+            var willChange = currentStroke.doesItGetDeleted;
             
-            var properties= dataArray.visuals[i].properties;
-            for(var k=0; k< properties.length; k++){ //for all properties of the stroke
-                var property=properties[k];
-                if (property.type == "basicProperty"){
-                    if (property.time < current & property.time >= keyframeTime) {
-                        var r=parseFloat(property.redFill) * 255;
-                        var g=parseFloat(property.greenFill) * 255;
-                        var b=parseFloat(property.blueFill) * 255;
-                        context.fillStyle="rgba("+r+","+g+
-                                          ","+b+","+property.alphaFill+")";
-                        
-                        
-                        r=parseFloat(property.red) * 255;
-                        g=parseFloat(property.green) * 255;
-                        b=parseFloat(property.blue) * 255;
-                        context.strokeStyle="rgba("+r+","+g+
-                                          ","+b+","+property.alpha+")";
-                        
-                        
-                        //TODO: USE THE THICKNESS
-                        context.lineWidth = property.thickness*xscale/80;
+            if(willChange & tmin < current)
+                dynamicStrokes.push(i);
+            
+            if(tmin < current & !willChange) {
+                var data = currentStroke.vertices;
+             
+                context.beginPath();
+                
+                var properties= currentStroke.properties;
+                for(var k=0; k< properties.length; k++){ //for all properties of the stroke
+                    var property=properties[k];
+                    if (property.type == "basicProperty"){
+                        if (property.time < current & property.time >= keyframeTime) {
+                            var r=parseFloat(property.redFill) * 255;
+                            var g=parseFloat(property.greenFill) * 255;
+                            var b=parseFloat(property.blueFill) * 255;
+                            context.fillStyle="rgba("+r+","+g+
+                                              ","+b+","+property.alphaFill+")";
+                            
+                            
+                            r=parseFloat(property.red) * 255;
+                            g=parseFloat(property.green) * 255;
+                            b=parseFloat(property.blue) * 255;
+                            context.strokeStyle="rgba("+r+","+g+
+                                              ","+b+","+property.alpha+")";
+                            
+                            
+                            //TODO: USE THE THICKNESS
+                            context.lineWidth = property.thickness*xscale/50;
+                        }
                     }
                 }
+                
+    //            context.lineWidth = xscale/8;
+                for (var j = 0; j < data.length; j++) { //for all verticies
+                    if (data[j].t < current & data[j].t >= keyframeTime){
+                        var x=data[j].x*xscale;
+                        var y=data[j].y*yscale;
+                        var pressure = data[j].pressure;
+                        calligraphize(context,x,ymax*yscale-y,pressure);
+                    }
+                }
+                
+                context.fill();
+                context.stroke();
+                
             }
-//            context.lineWidth = xscale/8;
-			for (var j = 0; j < data.length; j++) { //for all verticies
-				if (data[j].t < current & data[j].t >= keyframeTime){
-					var x=data[j].x*xscale;
-					var y=data[j].y*yscale;
-                    var pressure = data[j].pressure;
-                    calligraphize(context,x,ymax*yscale-y,pressure);
-				}
-			}
-            
-            context.fill();
-            context.stroke();
         }
         
         //saves a keyframe every 10 seconds
@@ -227,6 +242,64 @@ var Grapher = function() {
                 var newKeyframe = new Image();
                 newKeyframe.src = c.toDataURL();
                 keyframes[newKeyframeID] = newKeyframe;
+            }
+        }
+        
+        //DRAW ALL TIME-CHANGING STROKES
+        for(i in dynamicStrokes) {
+            var currentStroke = dataArray.visuals[dynamicStrokes[i]];
+            var data = currentStroke.vertices;
+            var deleted = false;
+             
+            context.beginPath();
+            
+            var properties= currentStroke.properties;
+            for(var k=0; k< properties.length; k++){ //for all properties of the stroke
+                var property=properties[k];
+                if (property.time < current) {
+                    var fadeIndex = 1;
+                    if(property.type === "fadingProperty") {
+                        var timeBeginFade = currentStroke.tDeletion+property.timeBeginFade;
+                        var fadeDuration = property.durationOfFade;
+                        fadeIndex -= (current-timeBeginFade)/fadeDuration;
+                        if(fadeIndex < 0)
+                            deleted = true;
+                    }
+                    if(property.type === "basicProperty") {
+                        if(currentStroke.tDeletion < current)
+                            deleted = true;
+                    }
+                    
+                    if(!deleted) {
+                        var r=parseFloat(property.redFill) * 255;
+                        var g=parseFloat(property.greenFill) * 255;
+                        var b=parseFloat(property.blueFill) * 255;
+                        context.fillStyle="rgba("+r+","+g+
+                                          ","+b+","+(property.alphaFill*fadeIndex)+")";
+                        
+                        r=parseFloat(property.red) * 255;
+                        g=parseFloat(property.green) * 255;
+                        b=parseFloat(property.blue) * 255;
+                        context.strokeStyle="rgba("+r+","+g+
+                                          ","+b+","+(property.alpha*fadeIndex)+")";
+                        
+                        context.lineWidth = property.thickness*xscale/50;
+                    }
+                }
+            }
+            
+            if(!deleted) {
+                for (var j = 0; j < data.length; j++) { //for all verticies
+                    if (data[j].t < current){
+                        var x=data[j].x*xscale;
+                        var y=data[j].y*yscale;
+                        var pressure = data[j].pressure;
+                        calligraphize(context,x,ymax*yscale-y,pressure);
+                    }
+                }
+                
+                context.fill();
+                context.stroke();
             }
         }
     }

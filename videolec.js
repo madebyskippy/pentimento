@@ -53,13 +53,14 @@ var Grapher = function() {
     function getData(file) {
         console.log(JSON.parse(file.responseText));
         dataArray = JSON.parse(file.responseText);
-        //REPLACE dataPoints WITH dataArray!!!!!!!!!!!!!!!
-        console.log(dataArray.strokes[0]);
-        imax = dataArray.strokes.length;
+        imax = dataArray.durationInSeconds;
+        xmax=dataArray.width;
+        ymax=dataArray.height;
+        resizeVisuals();
         console.log("imax: "+imax);
         $('#slider').slider("option","max",imax);
         slider.max=imax;
-        numStrokes=dataArray.strokes.length;
+        numStrokes=dataArray.visuals.length;
     }
 
 	function readFile(url, callback) {
@@ -85,7 +86,7 @@ var Grapher = function() {
         var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
         var done=false;
         for(var i=0; i<numStrokes; i++){
-            var currentStroke=dataArray.strokes[i];
+            var currentStroke=dataArray.visuals[i];
             for(var j=0;j<currentStroke.vertices.length; j++){
                 if (currentStroke.vertices[j].t<currentI){
                     //check closeness of x,y to this current point
@@ -108,7 +109,7 @@ var Grapher = function() {
         console.log(closestPoint);
         if (closestPoint.stroke!= -1){ //it found a close enough point
             //var time=parseFloat(dataPoints[closestPoint.stroke][0][2]); //TODO: CHANGE TO NEW DATA ARRAY
-            var time=parseFloat(dataArray.strokes[closestPoint.stroke].vertices[0].t);
+            var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
             context.clearRect(0,0,c.width,c.height);
@@ -151,7 +152,7 @@ var Grapher = function() {
         var done=false;
         for(var i=0; i<numStrokes; i++){
 			//var data = dataPoints[i];
-            var data = dataArray.strokes[i].vertices;
+            var data = dataArray.visuals[i].vertices;
 			context.beginPath();
             context.lineWidth = xscale/8;
 //			context.moveTo((data[0][0]*xscale),ymax*yscale-data[0][1]*yscale);

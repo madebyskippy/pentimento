@@ -18,12 +18,34 @@ var Grapher = function() {
                     /[numberofVertices=][0-9]+/ig, 
                     /[0-9.]+/ig];
     var dataPoints = new Array();
-    //array of strokes. one stroke is an array of [x,y,t],[x,y,t],...
+    /* array of strokes
+        stroke is an object:
+        { color: [color, time],[color, time] ... (color is a string)
+          width: [width, time],[width, time] ... (width is a number)
+          transform: time & transformation matrix
+          end: time exists if the stroke is deleted at any point in time
+          points: [x,y,t],[x,y,t],[x,y,t]... }
+          
+          (time is always number of seconds)
+        
+    */
+    
+    /*
+        how the json is organized:
+        array of stroke objects
+        stroke: {
+            verticies: [ {"x": 0, "y": 0, "t": 0, "pressure":0}, {} ...],
+            properties: [ {"type": "", "time": 0, "thickness":0, "color":0..., "colorfill": 0...}, {} ...]
+        }
+        length: 0 (length of total lecture in seconds)
+        height: 0
+        width: 0 (both of the lecture screen)
+    */
     
     var imax;	// maximum time value
     
     var initialTime; //initial time of start of video
-    var currentI; //current index of time (in seconds)
+    var currentI=0; //current index of time (in seconds)
     var currentTime; //current time, as given by date.now();
     var offsetTime=0; //for use with pause
     var paused=true;
@@ -32,13 +54,18 @@ var Grapher = function() {
     
     // updates lines and dataPoints with new file
     function getData(file) {
-        lines = file.responseText.split("\n").slice();
-        matcher();
+        console.log("here it is \n "+file.responseText);
+        console.log(JSON.parse(file.responseText));
+        var dataArray = JSON.parse(file.responseText);
+        //lines = file.responseText.split("\n").slice();
+        //matcher();
     }
 
     function matcher() {
         var current = new Array();
         //current is array: [[x,y,t],[x,y,t],[x,y,t],...]
+        //current is a stroke object
+        //add the [[x,y,t],[x,y,t],[x,y,t],...] to the point property of the object
         for (i = 0; i < lines.length; i++) { //goes thru each line
             var str = lines[i];
             var x = null;
@@ -194,6 +221,7 @@ var Grapher = function() {
         var pausedTime=val*1000;
         setTime=true;
         offsetTime=pausedTime;
+        currentI=val;
 		context.clearRect(0,0,c.width,c.height);
         oneFrame(val);
         changeSlider(val);
@@ -246,6 +274,36 @@ var Grapher = function() {
         audio.pause();
         audio.currentTime=0;
         offsetTime=0;
+    }
+    
+    function jumpForward(){
+        jump(10);
+    }
+    
+    function jumpBack(){
+        jump(-10);
+    }
+    
+    function jump(val){
+        var initialpause=paused;
+        pause();
+        paused=initialpause;
+        var time=currentI+val;
+        if (time > imax) time = parseInt(imax);
+        if (time < 0) time=0;
+        currentI=time;
+        offsetTime=time*1000;
+        setTime=true;
+        
+        context.clearRect(0,0,c.width,c.height);
+        oneFrame(time);
+        changeSlider(time);
+        audio.currentTime=time;
+        
+        if(!paused){ // if it wasn't paused, keep playing
+            paused=true; //it only starts if it was previously paused.
+            start();
+        }
     }
     
     function resizeControls(vidWidth){
@@ -346,6 +404,9 @@ var Grapher = function() {
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
         
+        $('.buttons').append('<button class="jumpBack"> < 10s </button>');
+        $('.buttons').append('<button class="jumpForward"> 10s > </button>');
+        
         $('#slider').slider({
             max:100,
             min:0,
@@ -364,38 +425,19 @@ var Grapher = function() {
                     //only call if it was a user-induced change, not program-induced
         });
         
-//        var windowWidth=$(window).width();
-//        var windowHeight=$(window).height();
-//        var videoDim;
-//        //fit canvas to window width
-//        if (windowWidth>(windowHeight+150)) { //take smaller of the two
-//            videoDim=(windowHeight-200);
-//            var scaleFactor=ymax;
-//        }
-//        else {
-//            videoDim=windowWidth-125;
-//            var scaleFactor=xmax;
-//        }
-//        console.log(windowWidth,windowHeight);
-        
         
         c=root.find('.video')[0];
         
         resizeVisuals();
         
-//        c.height=ymax * videoDim/scaleFactor;
-//        c.width=xmax * videoDim/scaleFactor;
         context=c.getContext('2d');
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-//        if (c.width<575) {
-//            resizeControls(c.width);
-//        }
-        
-//        yscale=(c.height)/ymax;
-//        xscale=(c.width)/xmax;
         readFile(datafile,getData); //dataPoints now filled with data
+        
+        root.find('.jumpForward').on('click',jumpForward);
+        root.find('.jumpBack').on('click',jumpBack);
         
         root.find('.pause').on('click',pause);
         root.find('.start').on('click',start);
@@ -428,7 +470,7 @@ var Grapher = function() {
     var css = document.createElement('link');
     css.setAttribute('rel', 'stylesheet');
     css.setAttribute('type', 'text/css');
-    css.setAttribute('href', 'style.css'); // XXX TODO CHANGEME!!
+    css.setAttribute('href', 'style.css');
     document.head.appendChild(css);
 
     if ('jQuery' in window) {
@@ -464,19 +506,39 @@ TODO:
 -reorganize data so that you have type of stroke in it
     (so you can do color, highlight, etc)
     
-    changes over time
+    changes over time for each stroke, for lecture
     color
     stroke width
     
     background slides
+        -display pdf? images?
+        -pdf to svg and then display svgs
     
-    user interacting drag
-        -have a 'return to default' button
+    user interacting drag -- richard is working on this
+        -pause it first
+        - animate it back to origional state (when it ppresses play)
+        - scroll bars to give people an idea of how big the canvas is?
+        -change mouse cursor to a hand to suggest you can drag
+        
+        - zoom while playing 
+        - zoom that follows stuff that's being written
+        
+    when you click a stroke and it jumps back to the time,
+        grey out all that's happened since then instead of just erasing
+        -maybe make the mouse crosshairs?
+        
+    set time skips (10s, 15s, one chapter, one slide, etc)
+        -done (unless bugs are found)
     
-    each stroke will have its own list of events (events over time)
-    & lecture itself will have a list of events
+    caligraphic strokes -- richard is doing this 
+    
+    farthest point button  ( movable?)
+        -put marks in the timeline 
+    
+    full screen mode
     
 CURRENT BUGS:
+    - jump forward/back buttons break before you press play
 
 */
 

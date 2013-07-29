@@ -87,7 +87,6 @@ var Grapher = function() {
 	function readFile(url, callback) {
 		var txtFile = new XMLHttpRequest();
 		txtFile.open("GET", url, true);	
-		//txtFile.setRequestHeader('User-Agent','XMLHTTP/1.0');
 		txtFile.onreadystatechange = function() {
 			if (txtFile.readyState != 4) {return;}  // document is ready to parse.	
 			if (txtFile.status != 200 && txtFile.status != 304) {return;}  // file is found
@@ -98,7 +97,6 @@ var Grapher = function() {
 	}
     
     
-    //called when you click on the canvas
     //called when you click on the canvas
     function selectStroke(x,y){
         x=x/xscale;
@@ -124,11 +122,9 @@ var Grapher = function() {
         
         console.log(closestPoint);
         if (closestPoint.stroke!= -1){ //it found a close enough point
-            //var time=parseFloat(dataPoints[closestPoint.stroke][0][2]); //TODO: CHANGE TO NEW DATA ARRAY
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
-//            context.clearRect(0,0,c.width,c.height);
             c.width = c.width;
             context.setTransform(totalZoom,0,0,totalZoom,
                                  translateX,translateY);
@@ -188,7 +184,6 @@ var Grapher = function() {
         if (currentI>imax) stop();
 	}
     
-/*************I MADE CHANGES 7/24*****************/    
     //draw a parallelogram for each pair of points
     function calligraphize(x, y, pressure) {
         var penWidth = 32*pressure*context.lineWidth;
@@ -199,7 +194,6 @@ var Grapher = function() {
         context.lineTo(x-penWidth,y+penWidth);
     }
     
-    //CHANGE TO WORK WITH NEW DATA!!!!
     function oneFrame(current){
         
         var dynamicStrokes = [];
@@ -242,7 +236,6 @@ var Grapher = function() {
                     }
                 }
                 
-    //            context.lineWidth = xscale/8;
                 for (var j = 0; j < data.length; j++) { //for all verticies
                     if (data[j].t < current){
                         var x=data[j].x*xscale;
@@ -316,7 +309,6 @@ var Grapher = function() {
             }
         }
     }
-/***************END CHANGES*******************/
     
     function changeSlider(current){
         if (current<imax){ 
@@ -345,7 +337,6 @@ var Grapher = function() {
         setTime=true;
         offsetTime=pausedTime;
         currentI=val;
-//		context.clearRect(0,0,c.width,c.height);
         c.width = c.width;
         context.translate(translateX, translateY);
         context.scale(totalZoom, totalZoom);
@@ -400,9 +391,6 @@ var Grapher = function() {
     
     function start(){
         if(paused){
-            //I MADE CHANGES 7/24
-//            context.restore();
-            //7/25
             $('#slider-vertical').slider({disabled:true});
             wasPanning = false;
             
@@ -447,10 +435,6 @@ var Grapher = function() {
     }
     
     function pause(){
-        //I MADE CHANGES 7/24
-//        if(!wasPanning)
-//            context.save();
-        //7/25
         $('#slider-vertical').slider({disabled:false});
         
         paused=true;
@@ -470,19 +454,15 @@ var Grapher = function() {
         draw=clearInterval(draw);
         
         furthestpoint=0;
-        //I MADE CHANGES 7/24
-//        context.clearRect(0,0,c.width,c.height);
         c.width = c.width;
         context.translate(translateX, translateY);
         context.scale(totalZoom, totalZoom);
-        //7/25
         context.save();
         $('#slider-vertical').slider({disabled:true,value:1});
         $('#zoomlabel').html(1);
         translateX = 0;
         translateY = 0;
         totalZoom = 1;
-        //END CHANGES
         $('#slider').slider('value', 0);
         root.find('.time').html('0');
         
@@ -537,7 +517,6 @@ var Grapher = function() {
         offsetTime=time*1000;
         setTime=true;
         
-//        context.clearRect(0,0,c.width,c.height);
         c.width = c.width;
         context.translate(translateX, translateY);
         context.scale(totalZoom, totalZoom);
@@ -563,7 +542,6 @@ var Grapher = function() {
         $('.timeControls').css('width','375px');
         $('#slider').css('width','300px');
         $('#slider').css('margin-top','20px');
-        //I MADE CHANGES 7/25
         $('.zoomslider').css('height', '190px');
         $('.time').css('margin-top','20px');
         oneFrame(currentI);
@@ -573,8 +551,6 @@ var Grapher = function() {
         var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
         var windowHeight=$(window).height();
-        //console.log(windowHeight,windowWidth);
-        //$('#errorcheck').html(windowHeight+' ,'+windowWidth);
         var videoDim;
         //fit canvas to window width
         if (windowWidth>(windowHeight+150)) { //take smaller of the two
@@ -583,14 +559,11 @@ var Grapher = function() {
                 videoDim=100;
             }
             var scaleFactor=ymax;
-            //$('#errorcheck').append(' y ' + videoDim);
         }
         else {
             videoDim=windowWidth-125;
             var scaleFactor=xmax;
-            //$('#errorcheck').append(' x');
         }
-        //console.log(windowHeight,windowWidth,videoDim);
         c.height=ymax * videoDim/scaleFactor;
         c.width=xmax * videoDim/scaleFactor;
         yscale=(c.height)/ymax;
@@ -603,12 +576,10 @@ var Grapher = function() {
     
     var template="<a href='index.html'>index</a><br><div class='lecture'>"
         + "<canvas class='video' style='cursor:crosshair;'></canvas>"
-    //I MADE CHANGES 7/25
         + "<div class='zoomslider' style='display:inline-block;position:absolute;margin-left:10px;'>"
         + "+<div id='slider-vertical' style='height:75%;'></div>-"
         + "<div id='zoomlabel'>1</div>"
         + "</div>"
-    //END CHANGES
         + "<br> <div class='controls'>"
         + "<div class='buttons'>"
         + "<input class='start' type='button'/>"
@@ -658,7 +629,6 @@ var Grapher = function() {
         $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
 
-/*********************I MADE CHANGES 7/25********/
         var prevX, prevY, prevZ;
         $('#slider-vertical').slider({
             disabled: true,
@@ -678,7 +648,6 @@ var Grapher = function() {
             slide: function(event, ui) {
                 totalZoom = ui.value;
                 $('#zoomlabel').html(totalZoom);
-//                context.clearRect(0,0,c.width,c.height);
                 c.width = c.width;
                 translateX = prevX + (1-totalZoom/prevZ)*(c.width/2-prevX);
                 translateY = prevY + (1-totalZoom/prevZ)*(c.height/2-prevY);
@@ -687,7 +656,6 @@ var Grapher = function() {
                 oneFrame(currentI);
             }
         });
-/*********************END CHANGES****************/
         
         
         c=root.find('.video')[0];
@@ -698,7 +666,6 @@ var Grapher = function() {
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-/*****************I MADE CHANGES 7/24****************/
         var isPanning = false,
             previousX,
             previousY,
@@ -709,7 +676,6 @@ var Grapher = function() {
             previousX = e.x;
             previousY = e.y;
             if(!wasPanning) {
-//                pausedBeforePan = paused;
                 pause();
             }
             wasPanning = false;
@@ -718,7 +684,6 @@ var Grapher = function() {
         c.addEventListener('mousemove', function(e) {
             if(isPanning) {
                 wasPanning = true;
-//                context.clearRect(0,0,c.width,c.height);
                 c.width = c.width;
                 var newTx = (e.x-previousX);
                 var newTy = (e.y-previousY);
@@ -735,7 +700,6 @@ var Grapher = function() {
         c.addEventListener('mouseup', function(event) {
             isPanning = false;
             
-            //I MADE CHANGES 7/24
             if(!wasPanning) {
                 paused = false;
                 var mx=event.pageX;
@@ -749,7 +713,6 @@ var Grapher = function() {
         });
         
         context.save();
-/*********************END CHANGES***************/
         
         readFile(datafile,getData); //dataPoints now filled with data
         

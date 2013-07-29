@@ -208,7 +208,7 @@ var Grapher = function() {
              
                 context.beginPath();
                 
-                //add the properties
+                //process the properties
                 var properties= currentStroke.properties;
                 for(var k=0; k< properties.length; k++){ //for all properties of the stroke
                     var property=properties[k];
@@ -227,7 +227,7 @@ var Grapher = function() {
                                 deleted = true;
                         }
                         
-                        if(!deleted || !currentStroke.doesItGetDeleted) { //if the stroke isn't deleted yet, add its properties
+                        if(!deleted || !currentStroke.doesItGetDeleted) { //add properties
                             var r=parseFloat(property.redFill) * 255;
                             var g=parseFloat(property.greenFill) * 255;
                             var b=parseFloat(property.blueFill) * 255;

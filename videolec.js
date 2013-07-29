@@ -178,10 +178,10 @@ var Grapher = function() {
             }
             $('#slider-vertical').slider('value', totalZoom);
             $('#zoomlabel').html(totalZoom);
-        }
-        clearFrame();
+            clearFrame();
         
-        oneFrame(currentI);
+            oneFrame(currentI);
+        }
         if (currentI>imax) stop();
 	}
     
@@ -195,116 +195,70 @@ var Grapher = function() {
         context.lineTo(x-penWidth,y+penWidth);
     }
     
+    //displays one frame
     function oneFrame(current){
-        
-        var dynamicStrokes = [];
         
         for(var i=0; i<numStrokes; i++){ //for all strokes
             var currentStroke = dataArray.visuals[i];
             var tmin = currentStroke.tMin;
-            var willChange = currentStroke.doesItGetDeleted;
+            var deleted=false;
             
-            if(willChange & tmin < current)
-                dynamicStrokes.push(i);
-            
-            if(tmin < current & !willChange) {
+            if(tmin < current){
                 var data = currentStroke.vertices;
              
                 context.beginPath();
                 
+                //add the properties
                 var properties= currentStroke.properties;
                 for(var k=0; k< properties.length; k++){ //for all properties of the stroke
                     var property=properties[k];
-                    if (property.type == "basicProperty"){
-                        if (property.time < current) {
+                    if (property.time < current) { //if property is to be shown
+                        var fadeIndex = 1;
+                        if(property.type === "fadingProperty") { //calculate fade rate
+                            var timeBeginFade = currentStroke.tDeletion+
+                                property.timeBeginFade;
+                            var fadeDuration = property.durationOfFade;
+                            fadeIndex -= (current-timeBeginFade)/fadeDuration;
+                            if(fadeIndex < 0)
+                                deleted = true;
+                        }
+                        if(property.type === "basicProperty") { //normal property
+                            if(currentStroke.tDeletion < current)
+                                deleted = true;
+                        }
+                        
+                        if(!deleted || !currentStroke.doesItGetDeleted) { //if the stroke isn't deleted yet, add its properties
                             var r=parseFloat(property.redFill) * 255;
                             var g=parseFloat(property.greenFill) * 255;
                             var b=parseFloat(property.blueFill) * 255;
                             context.fillStyle="rgba("+r+","+g+
-                                              ","+b+","+property.alphaFill+")";
-                            
+                                              ","+b+","+(property.alphaFill*fadeIndex)+")";
                             
                             r=parseFloat(property.red) * 255;
                             g=parseFloat(property.green) * 255;
                             b=parseFloat(property.blue) * 255;
                             context.strokeStyle="rgba("+r+","+g+
-                                              ","+b+","+property.alpha+")";
+                                              ","+b+","+(property.alpha*fadeIndex)+")";
                             
                             context.lineWidth = property.thickness*xscale/50;
                         }
                     }
                 }
                 
-                for (var j = 0; j < data.length; j++) { //for all verticies
-                    if (data[j].t < current){
-                        var x=data[j].x*xscale;
-                        var y=data[j].y*yscale;
-                        var pressure = data[j].pressure;
-                        calligraphize(x,ymax*yscale-y,pressure);
-                    }
-                }
-                
-                context.fill();
-                context.stroke();
-                
-            }
-        }
-        
-        //DRAW ALL TIME-CHANGING STROKES
-        for(i in dynamicStrokes) {
-            var currentStroke = dataArray.visuals[dynamicStrokes[i]];
-            var data = currentStroke.vertices;
-            var deleted = false;
-             
-            context.beginPath();
-            
-            var properties= currentStroke.properties;
-            for(var k=0; k< properties.length; k++){ //for all properties of the stroke
-                var property=properties[k];
-                if (property.time < current) {
-                    var fadeIndex = 1;
-                    if(property.type === "fadingProperty") {
-                        var timeBeginFade = currentStroke.tDeletion+property.timeBeginFade;
-                        var fadeDuration = property.durationOfFade;
-                        fadeIndex -= (current-timeBeginFade)/fadeDuration;
-                        if(fadeIndex < 0)
-                            deleted = true;
-                    }
-                    if(property.type === "basicProperty") {
-                        if(currentStroke.tDeletion < current)
-                            deleted = true;
+                //draw the stroke
+                if (!deleted || !currentStroke.doesItGetDeleted){
+                    for (var j = 0; j < data.length; j++) { //for all verticies
+                        if (data[j].t < current){
+                            var x=data[j].x*xscale;
+                            var y=data[j].y*yscale;
+                            var pressure = data[j].pressure;
+                            calligraphize(x,ymax*yscale-y,pressure);
+                        }
                     }
                     
-                    if(!deleted) {
-                        var r=parseFloat(property.redFill) * 255;
-                        var g=parseFloat(property.greenFill) * 255;
-                        var b=parseFloat(property.blueFill) * 255;
-                        context.fillStyle="rgba("+r+","+g+
-                                          ","+b+","+(property.alphaFill*fadeIndex)+")";
-                        
-                        r=parseFloat(property.red) * 255;
-                        g=parseFloat(property.green) * 255;
-                        b=parseFloat(property.blue) * 255;
-                        context.strokeStyle="rgba("+r+","+g+
-                                          ","+b+","+(property.alpha*fadeIndex)+")";
-                        
-                        context.lineWidth = property.thickness*xscale/50;
-                    }
+                    context.fill();
+                    context.stroke();
                 }
-            }
-            
-            if(!deleted) {
-                for (var j = 0; j < data.length; j++) { //for all verticies
-                    if (data[j].t < current){
-                        var x=data[j].x*xscale;
-                        var y=data[j].y*yscale;
-                        var pressure = data[j].pressure;
-                        calligraphize(x,ymax*yscale-y,pressure);
-                    }
-                }
-                
-                context.fill();
-                context.stroke();
             }
         }
     }
@@ -450,24 +404,12 @@ var Grapher = function() {
         draw=clearInterval(draw);
         
         furthestpoint=0;
-<<<<<<< HEAD
-        c.width = c.width;
-        context.translate(translateX, translateY);
-        context.scale(totalZoom, totalZoom);
-        context.save();
-        $('#slider-vertical').slider({disabled:true,value:1});
-        $('#zoomlabel').html(1);
-        translateX = 0;
-        translateY = 0;
-        totalZoom = 1;
-=======
         translateX = 0;
         translateY = 0;
         totalZoom = 1;
         clearFrame();
         $('#slider-vertical').slider({disabled:true,value:1});
         $('#zoomlabel').html(1);
->>>>>>> 87a48f3a98fbdbcacbde079248aad607e4453064
         $('#slider').slider('value', 0);
         root.find('.time').html('0');
         

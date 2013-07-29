@@ -46,6 +46,26 @@ input[type='button']:focus{
     opacity:1;
 }
 
+#slider .tick {
+    z-index:1;
+    background: #4f3;
+    border: none;
+    position: absolute;
+    height: 100%;
+    width: 2px;
+    left: 0%;
+    alt: 'furthest point'
+}
+
+#slider .ui-slider-handle {
+    width: .1em;
+    border: none;
+    background: #fff;
+    height: 100%;
+    top: 0;
+    margin-left: -.05em;
+}
+
 .pause{
     background-image: url('http://web.mit.edu/lilis/www/videolec/pause.png');
 }

@@ -89,7 +89,6 @@ var Grapher = function() {
 	function readFile(url, callback) {
 		var txtFile = new XMLHttpRequest();
 		txtFile.open("GET", url, true);	
-		//txtFile.setRequestHeader('User-Agent','XMLHTTP/1.0');
 		txtFile.onreadystatechange = function() {
 			if (txtFile.readyState != 4) {return;}  // document is ready to parse.	
 			if (txtFile.status != 200 && txtFile.status != 304) {return;}  // file is found
@@ -196,11 +195,10 @@ var Grapher = function() {
         $('#slider-vertical').slider('value', totalZoom);
         $('#zoomlabel').html(totalZoom);
         clearFrame();
-        
         oneFrame(currentI);
         if (currentI>imax) stop();
 	}
- 
+    
     //draw a parallelogram for each pair of points
     function calligraphize(x, y, pressure) {
         var penWidth = 32*pressure*context.lineWidth;
@@ -210,117 +208,71 @@ var Grapher = function() {
         context.moveTo(x,y);
         context.lineTo(x-penWidth,y+penWidth);
     }
- 
+    
+    //displays one frame
     function oneFrame(current){
-        
-        var dynamicStrokes = [];
         
         for(var i=0; i<numStrokes; i++){ //for all strokes
             var currentStroke = dataArray.visuals[i];
             var tmin = currentStroke.tMin;
-            var willChange = currentStroke.doesItGetDeleted;
+            var deleted=false;
             
-            if(willChange & tmin < current)
-                dynamicStrokes.push(i);
-            
-            if(tmin < current & !willChange) {
+            if(tmin < current){
                 var data = currentStroke.vertices;
              
                 context.beginPath();
                 
+                //add the properties
                 var properties= currentStroke.properties;
                 for(var k=0; k< properties.length; k++){ //for all properties of the stroke
                     var property=properties[k];
-                    if (property.type == "basicProperty"){
-                        if (property.time < current) {
+                    if (property.time < current) { //if property is to be shown
+                        var fadeIndex = 1;
+                        if(property.type === "fadingProperty") { //calculate fade rate
+                            var timeBeginFade = currentStroke.tDeletion+
+                                property.timeBeginFade;
+                            var fadeDuration = property.durationOfFade;
+                            fadeIndex -= (current-timeBeginFade)/fadeDuration;
+                            if(fadeIndex < 0)
+                                deleted = true;
+                        }
+                        if(property.type === "basicProperty") { //normal property
+                            if(currentStroke.tDeletion < current)
+                                deleted = true;
+                        }
+                        
+                        if(!deleted || !currentStroke.doesItGetDeleted) { //if the stroke isn't deleted yet, add its properties
                             var r=parseFloat(property.redFill) * 255;
                             var g=parseFloat(property.greenFill) * 255;
                             var b=parseFloat(property.blueFill) * 255;
                             context.fillStyle="rgba("+r+","+g+
-                                              ","+b+","+property.alphaFill+")";
-                            
+                                              ","+b+","+(property.alphaFill*fadeIndex)+")";
                             
                             r=parseFloat(property.red) * 255;
                             g=parseFloat(property.green) * 255;
                             b=parseFloat(property.blue) * 255;
                             context.strokeStyle="rgba("+r+","+g+
-                                              ","+b+","+property.alpha+")";
+                                              ","+b+","+(property.alpha*fadeIndex)+")";
                             
                             context.lineWidth = property.thickness*xscale/50;
                         }
                     }
                 }
                 
-                for (var j = 0; j < data.length; j++) { //for all verticies
-                    if (data[j].t < current){
-                        var x=data[j].x*xscale;
-                        var y=data[j].y*yscale;
-                        var pressure = data[j].pressure;
-                        calligraphize(x,ymax*yscale-y,pressure);
-                    }
-                }
-                
-                context.fill();
-                context.stroke();
-                
-            }
-        }
-        
-        //DRAW ALL TIME-CHANGING STROKES
-        for(i in dynamicStrokes) {
-            var currentStroke = dataArray.visuals[dynamicStrokes[i]];
-            var data = currentStroke.vertices;
-            var deleted = false;
-             
-            context.beginPath();
-            
-            var properties= currentStroke.properties;
-            for(var k=0; k< properties.length; k++){ //for all properties of the stroke
-                var property=properties[k];
-                if (property.time < current) {
-                    var fadeIndex = 1;
-                    if(property.type === "fadingProperty") {
-                        var timeBeginFade = currentStroke.tDeletion+property.timeBeginFade;
-                        var fadeDuration = property.durationOfFade;
-                        fadeIndex -= (current-timeBeginFade)/fadeDuration;
-                        if(fadeIndex < 0)
-                            deleted = true;
-                    }
-                    if(property.type === "basicProperty") {
-                        if(currentStroke.tDeletion < current)
-                            deleted = true;
+                //draw the stroke
+                if (!deleted || !currentStroke.doesItGetDeleted){
+                    for (var j = 0; j < data.length; j++) { //for all verticies
+                        if (data[j].t < current){
+                            var x=data[j].x*xscale;
+                            var y=data[j].y*yscale;
+                            var pressure = data[j].pressure;
+                            calligraphize(x,ymax*yscale-y,pressure);
+                        }
                     }
                     
-                    if(!deleted) {
-                        var r=parseFloat(property.redFill) * 255;
-                        var g=parseFloat(property.greenFill) * 255;
-                        var b=parseFloat(property.blueFill) * 255;
-                        context.fillStyle="rgba("+r+","+g+
-                                          ","+b+","+(property.alphaFill*fadeIndex)+")";
-                        
-                        r=parseFloat(property.red) * 255;
-                        g=parseFloat(property.green) * 255;
-                        b=parseFloat(property.blue) * 255;
-                        context.strokeStyle="rgba("+r+","+g+
-                                          ","+b+","+(property.alpha*fadeIndex)+")";
-                        
-                        context.lineWidth = property.thickness*xscale/50;
-                    }
+                    context.fill();
+                    context.stroke();
                 }
-            }
-            
-            if(!deleted) {
-                for (var j = 0; j < data.length; j++) { //for all verticies
-                    if (data[j].t < current){
-                        var x=data[j].x*xscale;
-                        var y=data[j].y*yscale;
-                        var pressure = data[j].pressure;
-                        calligraphize(x,ymax*yscale-y,pressure);
-                    }
-                }
-                
-                context.fill();
-                context.stroke();
             }
         }
     }
@@ -572,7 +524,6 @@ var Grapher = function() {
         $('.timeControls').css('width','375px');
         $('#slider').css('width','300px');
         $('#slider').css('margin-top','20px');
-        //I MADE CHANGES 7/25
         $('.zoomslider').css('height', '190px');
         $('.time').css('margin-top','20px');
         oneFrame(currentI);
@@ -595,7 +546,6 @@ var Grapher = function() {
             videoDim=windowWidth-125;
             var scaleFactor=xmax;
         }
-        
         c.height=ymax * videoDim/scaleFactor;
         c.width=xmax * videoDim/scaleFactor;
         yscale=(c.height)/ymax;

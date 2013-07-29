@@ -168,7 +168,7 @@ var Grapher = function() {
                     nextTransform = currentTransform;
                 }
             }
-            newTransform = jQuery(true,{},previousTransform);
+            newTransform = jQuery.extend(true,{},previousTransform);
             if (nextTransform.time !== previousTransform.time) {
                 console.log(nextTransform.tx, previousTransform.tx);
                 var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);

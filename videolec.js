@@ -17,6 +17,8 @@ var Grapher = function() {
     var audio;
     var isAudio=true;
     
+    var furthestpoint=0; // furthest point in seconds
+    
     /*
         **********the dataArray object****************
         durationInSeconds: number
@@ -342,6 +344,13 @@ var Grapher = function() {
             var zeros='';
             if (seconds % 1 === 0 ) zeros='.0';
             root.find('.time').html(minutes+":"+seconds+zeros);
+            
+            //update ticks
+            if (current > furthestpoint){
+                furthestpoint=current;
+                var percentage = (furthestpoint)/imax * 100;
+                $('.tick').css('left', percentage + '%');
+            }
         }
     }
     
@@ -420,6 +429,7 @@ var Grapher = function() {
         paused=true;
         draw=clearInterval(draw);
         
+        furthestpoint=0;
         //I MADE CHANGES 7/24
 //        context.clearRect(0,0,c.width,c.height);
         c.width = c.width;
@@ -603,6 +613,9 @@ var Grapher = function() {
                 }
                     //only call if it was a user-induced change, not program-induced
         });
+        
+        $('#slider').append('<div class="tick ui-widget-content"></div>');
+        $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
 
 /*********************I MADE CHANGES 7/25********/

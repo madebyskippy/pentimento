@@ -125,9 +125,7 @@ var Grapher = function() {
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
-            c.width = c.width;
-            context.setTransform(totalZoom,0,0,totalZoom,
-                                 translateX,translateY);
+            clearFrame();
             oneFrame(time);
             changeSlider(time);
             if (isAudio) audio.currentTime=time;
@@ -138,16 +136,20 @@ var Grapher = function() {
         }
     }
     
+    function clearFrame() {
+        c.width = c.width;
+        context.setTransform(totalZoom,0,0,totalZoom,
+                             translateX,translateY);
+    }
+    
     function getDistance(x1,y1,x2,y2){
         return Math.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
     }
     
     function graphData(){
-        c.width = c.width;
 		currentTime=Date.now(); //gets current time
 		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
 		changeSlider(currentI);
-        
         
         if (dataArray != undefined) {
             var cameraChanges = dataArray.cameraTransforms;
@@ -177,8 +179,7 @@ var Grapher = function() {
             $('#slider-vertical').slider('value', totalZoom);
             $('#zoomlabel').html(totalZoom);
         }
-        context.setTransform(totalZoom,0,0,totalZoom,
-                             translateX,translateY);
+        clearFrame();
         
         oneFrame(currentI);
         if (currentI>imax) stop();
@@ -229,8 +230,6 @@ var Grapher = function() {
                             context.strokeStyle="rgba("+r+","+g+
                                               ","+b+","+property.alpha+")";
                             
-                            
-                            //TODO: USE THE THICKNESS
                             context.lineWidth = property.thickness*xscale/50;
                         }
                     }
@@ -337,9 +336,7 @@ var Grapher = function() {
         setTime=true;
         offsetTime=pausedTime;
         currentI=val;
-        c.width = c.width;
-        context.translate(translateX, translateY);
-        context.scale(totalZoom, totalZoom);
+        clearFrame();
         oneFrame(val);
         changeSlider(val);
         if (isAudio) audio.currentTime=val;
@@ -362,14 +359,13 @@ var Grapher = function() {
     }
     
     function animateToPlay(startTime, duration, tx, ty, tz, nx, ny, nz) {
-        //LINEARLY INTERPOLATE BETWEEN NEXT TRANSFORM AND PREVIOUS TRANSFORM
         var interpolatedTime = (Date.now() - startTime)/duration;
         
         if(interpolatedTime < 1) {
             c.width = c.width;
             var newZoom = tz+(nz - tz)*interpolatedTime;
-            var newX = (tx+(nx - tx)*interpolatedTime)/newZoom;
-            var newY = (ty+(ny - ty)*interpolatedTime)/newZoom;
+            var newX = (tx+(nx - tx)*interpolatedTime);
+            var newY = (ty+(ny - ty)*interpolatedTime);
             context.setTransform(newZoom,0,0,newZoom,
                                  newX,newY);
             oneFrame(currentI);
@@ -454,6 +450,7 @@ var Grapher = function() {
         draw=clearInterval(draw);
         
         furthestpoint=0;
+<<<<<<< HEAD
         c.width = c.width;
         context.translate(translateX, translateY);
         context.scale(totalZoom, totalZoom);
@@ -463,6 +460,14 @@ var Grapher = function() {
         translateX = 0;
         translateY = 0;
         totalZoom = 1;
+=======
+        translateX = 0;
+        translateY = 0;
+        totalZoom = 1;
+        clearFrame();
+        $('#slider-vertical').slider({disabled:true,value:1});
+        $('#zoomlabel').html(1);
+>>>>>>> 87a48f3a98fbdbcacbde079248aad607e4453064
         $('#slider').slider('value', 0);
         root.find('.time').html('0');
         
@@ -492,8 +497,6 @@ var Grapher = function() {
         $('.zoomslider').css('height',vidWidth/3);
         
         $('.time').css('margin-top',buttonWidths/2);
-                         
-        
         
         oneFrame(currentI);
     }
@@ -517,9 +520,7 @@ var Grapher = function() {
         offsetTime=time*1000;
         setTime=true;
         
-        c.width = c.width;
-        context.translate(translateX, translateY);
-        context.scale(totalZoom, totalZoom);
+        clearFrame();
         oneFrame(time);
         changeSlider(time);
         if (isAudio) audio.currentTime=time;
@@ -628,7 +629,6 @@ var Grapher = function() {
         $('#slider').append('<div class="tick ui-widget-content"></div>');
         $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
-
         var prevX, prevY, prevZ;
         $('#slider-vertical').slider({
             disabled: true,
@@ -643,20 +643,16 @@ var Grapher = function() {
                 prevX = translateX;
                 prevY = translateY;
                 prevZ = totalZoom;
-                console.log(translateX, translateY);
             },
             slide: function(event, ui) {
                 totalZoom = ui.value;
                 $('#zoomlabel').html(totalZoom);
-                c.width = c.width;
                 translateX = prevX + (1-totalZoom/prevZ)*(c.width/2-prevX);
                 translateY = prevY + (1-totalZoom/prevZ)*(c.height/2-prevY);
-                context.translate(translateX, translateY);
-                context.scale(totalZoom, totalZoom);
+                clearFrame();
                 oneFrame(currentI);
             }
         });
-        
         
         c=root.find('.video')[0];
         
@@ -684,13 +680,11 @@ var Grapher = function() {
         c.addEventListener('mousemove', function(e) {
             if(isPanning) {
                 wasPanning = true;
-                c.width = c.width;
                 var newTx = (e.x-previousX);
                 var newTy = (e.y-previousY);
                 translateX += newTx;
                 translateY += newTy;
-                context.translate(translateX,translateY);
-                context.scale(totalZoom, totalZoom);
+                clearFrame();
                 oneFrame(currentI);
                 previousX = e.x;
                 previousY = e.y;
@@ -707,7 +701,6 @@ var Grapher = function() {
                 var offset=root.find('.video').offset(); //array of left and top
                 mx=Math.round((mx-offset.left-translateX)/totalZoom);
                 my=Math.round((my-offset.top-translateY)/totalZoom);
-                console.log(mx, my);
                 selectStroke(mx,my);
             }
         });

@@ -153,23 +153,32 @@ var Grapher = function() {
         
         
         if (dataArray != undefined) {
-            var cameraChanges=dataArray.cameraTransforms;
-            var latestTransform=cameraChanges[0];
+            var cameraChanges = dataArray.cameraTransforms;
+            var nextTransform = cameraChanges[cameraChanges.length-1];
+            var previousTransform = cameraChanges[0];
             for(var i=0; i< cameraChanges.length; i++){
                 var currentTransform = cameraChanges[i];
-                if (currentTransform.time < currentI && currentTransform.time > 0){
-                    if (currentTransform.time > latestTransform.time){
-                        latestTransform=currentTransform;
-                    }
+                if (currentTransform.time < currentI & currentTransform.time > previousTransform.time) {
+                    previousTransform = currentTransform;
+                }
+                if(currentTransform.time > currentI & currentTransform.time < nextTransform.time) {
+                    nextTransform = currentTransform;
                 }
             }
-            if (latestTransform!= -1 ) {
-                totalZoom = latestTransform.m11;
-                $('#slider-vertical').slider('value', totalZoom);
-                $('#zoomlabel').html(totalZoom);
-                translateX = latestTransform.tx/totalZoom;
-                translateY = latestTransform.ty/totalZoom;
+            totalZoom = previousTransform.m11;
+            translateX = previousTransform.tx/totalZoom;
+            translateY = previousTransform.ty/totalZoom;
+            if (nextTransform.time != previousTransform.time) {
+                //LINEARLY INTERPOLATE BETWEEN NEXT TRANSFORM AND PREVIOUS TRANSFORM
+                var interpolatedTime = (currentI - previousTransform.time)/(nextTransform.time - previousTransform.time);
+                totalZoom = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
+                translateX = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
+                translateY = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
+                translateX = translateX/totalZoom;
+                translateY = translateY/totalZoom;
             }
+            $('#slider-vertical').slider('value', totalZoom);
+            $('#zoomlabel').html(totalZoom);
         }
         context.setTransform(totalZoom,0,0,totalZoom,
                              translateX,translateY);
@@ -189,23 +198,8 @@ var Grapher = function() {
         context.lineTo(x-penWidth,y+penWidth);
     }
     
-//    var keyframes = {};
-    
     //CHANGE TO WORK WITH NEW DATA!!!!
     function oneFrame(current){
-        
-//        var keyframeTime = parseInt(current/5)*5;
-//        var keyframeID = String(keyframeTime);
-//        //FUZZY WHEN ZOOMED IN
-//        if(totalZoom > 1)
-//            keyframeTime = 0;
-//        while(keyframes[keyframeID] === undefined & keyframeTime !== 0) {
-//            keyframeTime -= 5;
-//            keyframeID = String(keyframeTime);
-//        }
-//        if(keyframeTime !== 0)
-//            context.drawImage(keyframes[keyframeID],0,0,c.width,c.height);
-        var keyframeTime = 0;
         
         var dynamicStrokes = [];
         
@@ -226,7 +220,7 @@ var Grapher = function() {
                 for(var k=0; k< properties.length; k++){ //for all properties of the stroke
                     var property=properties[k];
                     if (property.type == "basicProperty"){
-                        if (property.time < current & property.time >= keyframeTime) {
+                        if (property.time < current) {
                             var r=parseFloat(property.redFill) * 255;
                             var g=parseFloat(property.greenFill) * 255;
                             var b=parseFloat(property.blueFill) * 255;
@@ -249,7 +243,7 @@ var Grapher = function() {
                 
     //            context.lineWidth = xscale/8;
                 for (var j = 0; j < data.length; j++) { //for all verticies
-                    if (data[j].t < current & data[j].t >= keyframeTime){
+                    if (data[j].t < current){
                         var x=data[j].x*xscale;
                         var y=data[j].y*yscale;
                         var pressure = data[j].pressure;
@@ -262,16 +256,6 @@ var Grapher = function() {
                 
             }
         }
-        
-        //saves a keyframe every 5 seconds
-//        if(current % 5 < 1 & current >= 5 & totalZoom === 1) {
-//            var newKeyframeID = String(parseInt(current));
-//            if(keyframes[newKeyframeID] === undefined) {
-//                var imgObj = new Image();
-//                imgObj.src = c.toDataURL();
-//                keyframes[newKeyframeID] = imgObj;
-//            }
-//        }
         
         //DRAW ALL TIME-CHANGING STROKES
         for(i in dynamicStrokes) {
@@ -378,18 +362,26 @@ var Grapher = function() {
         paused=initialpause;
     }
     
-    function start(){
-        if(paused){
-            //I MADE CHANGES 7/24
-            context.restore();
-            //7/25
-            $('#slider-vertical').slider({disabled:true,value:1});
-            $('#zoomlabel').html(1);
-            translateX = 0;
-            translateY = 0;
-            totalZoom = 1;
-            wasPanning = false;
+    function animateToPlay(startTime, duration, tx, ty, tz, nx, ny, nz) {
+        //LINEARLY INTERPOLATE BETWEEN NEXT TRANSFORM AND PREVIOUS TRANSFORM
+        var interpolatedTime = (Date.now() - startTime)/duration;
+        
+        if(interpolatedTime < 1) {
+            c.width = c.width;
+            var newZoom = tz+(nz - tz)*interpolatedTime;
+            var newX = (tx+(nx - tx)*interpolatedTime)/newZoom;
+            var newY = (ty+(ny - ty)*interpolatedTime)/newZoom;
+            context.setTransform(newZoom,0,0,newZoom,
+                                 newX,newY);
+            oneFrame(currentI);
             
+            setTimeout(function() {
+                animateToPlay(startTime, duration, tx, ty, tz, nx, ny, nz);
+            }, 10);
+        }
+        else {
+            $('#slider-vertical').slider('value', totalZoom);
+            $('#zoomlabel').html(totalZoom);
             paused=false;
             setTime=false;
             initialTime=Date.now()-offsetTime;
@@ -398,10 +390,58 @@ var Grapher = function() {
         }
     }
     
+    function start(){
+        if(paused){
+            //I MADE CHANGES 7/24
+//            context.restore();
+            //7/25
+            $('#slider-vertical').slider({disabled:true});
+            wasPanning = false;
+            
+            var cameraChanges = dataArray.cameraTransforms;
+            var nextTransform = cameraChanges[cameraChanges.length-1];
+            var previousTransform = cameraChanges[0];
+            for(var i=0; i< cameraChanges.length; i++){
+                var currentTransform = cameraChanges[i];
+                if(currentTransform.time > currentI & currentTransform.time < nextTransform.time) {
+                    nextTransform = currentTransform;
+                }
+                if(currentTransform.time < currentI & currentTransform.time > previousTransform.time) {
+                    previousTransform = currentTransform;
+                }
+            }
+            var nextZoom = previousTransform.m11;
+            var nextX = previousTransform.tx/nextZoom;
+            var nextY = previousTransform.ty/nextZoom;
+            if (nextTransform.time != previousTransform.time) {
+                //LINEARLY INTERPOLATE BETWEEN NEXT TRANSFORM AND PREVIOUS TRANSFORM
+                var interpolatedTime = (currentI - previousTransform.time)/(nextTransform.time - previousTransform.time);
+                nextZoom = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
+                nextX = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
+                nextY = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
+                nextX = nextX/nextZoom;
+                nextY = nextY/nextZoom;
+            }
+            
+            if(nextZoom !== totalZoom | nextX/nextZoom !== translateX | nextY/nextZoom !== translateY) {
+                animateToPlay(Date.now(), 200, translateX, translateY, totalZoom, nextX, nextY, nextZoom);
+            }
+            else {
+                $('#slider-vertical').slider('value', totalZoom);
+                $('#zoomlabel').html(totalZoom);
+                paused=false;
+                setTime=false;
+                initialTime=Date.now()-offsetTime;
+                draw=setInterval(graphData,50);
+                audio.play();
+            }
+        }
+    }
+    
     function pause(){
         //I MADE CHANGES 7/24
-        if(!wasPanning)
-            context.save();
+//        if(!wasPanning)
+//            context.save();
         //7/25
         $('#slider-vertical').slider({disabled:false});
         
@@ -633,7 +673,6 @@ var Grapher = function() {
                 context.translate(translateX, translateY);
                 context.scale(totalZoom, totalZoom);
                 oneFrame(currentI);
-                console.log(translateX, translateY);
             }
         });
 /*********************END CHANGES****************/
@@ -690,8 +729,8 @@ var Grapher = function() {
                 var mx=event.pageX;
                 var my=event.pageY;
                 var offset=root.find('.video').offset(); //array of left and top
-                mx=Math.round((mx-offset.left-translateX-(1-totalZoom)*(c.width/2-translateX))/totalZoom);
-                my=Math.round((my-offset.top-translateY-(1-totalZoom)*(c.height/2-translateY))/totalZoom);
+                mx=Math.round((mx-offset.left-translateX)/totalZoom);
+                my=Math.round((my-offset.top-translateY)/totalZoom);
                 console.log(mx, my);
                 selectStroke(mx,my);
             }

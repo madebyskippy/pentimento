@@ -147,7 +147,7 @@ var Grapher = function() {
     }
     
     function graphData(){
-		context.clearRect(0,0,c.width,c.height);
+		context.clearRect(0,0,dataArray.width,dataArray.height);
 		currentTime=Date.now(); //gets current time
 		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
 		changeSlider(currentI);

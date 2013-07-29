@@ -103,7 +103,6 @@ var Grapher = function() {
         y=(c.height-y)/yscale;
         var minDistance=5; //if the point is further than this then ignore it
         var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
-        var done=false;
         for(var i=0; i<numStrokes; i++){
             var currentStroke=dataArray.visuals[i];
             for(var j=0;j<currentStroke.vertices.length; j++){
@@ -117,12 +116,8 @@ var Grapher = function() {
                         closestPoint.point=j;
                         closestPoint.time=currentStroke.vertices[j].t;
                     }
-                }else{
-                    done=true;
-                    break;
                 }
             }
-            if (done) break;
         }
         
         console.log(closestPoint);
@@ -131,7 +126,10 @@ var Grapher = function() {
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
-            context.clearRect(0,0,c.width,c.height);
+//            context.clearRect(0,0,c.width,c.height);
+            c.width = c.width;
+            context.setTransform(totalZoom,0,0,totalZoom,
+                                 translateX,translateY);
             oneFrame(time);
             changeSlider(time);
             if (isAudio) audio.currentTime=time;
@@ -147,18 +145,42 @@ var Grapher = function() {
     }
     
     function graphData(){
-		context.clearRect(0,0,dataArray.width,dataArray.height);
+        c.width = c.width;
 		currentTime=Date.now(); //gets current time
 		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
 		changeSlider(currentI);
+        
+        
+        if (dataArray != undefined) {
+            var cameraChanges=dataArray.cameraTransforms;
+            var latestTransform=cameraChanges[0];
+            for(var i=0; i< cameraChanges.length; i++){
+                var currentTransform = cameraChanges[i];
+                if (currentTransform.time < currentI && currentTransform.time > 0){
+                    if (currentTransform.time > latestTransform.time){
+                        latestTransform=currentTransform;
+                    }
+                }
+            }
+            if (latestTransform!= -1 ) {
+                totalZoom = latestTransform.m11;
+                $('#slider-vertical').slider('value', totalZoom);
+                $('#zoomlabel').html(totalZoom);
+                translateX = latestTransform.tx/totalZoom;
+                translateY = latestTransform.ty/totalZoom;
+            }
+        }
+        context.setTransform(totalZoom,0,0,totalZoom,
+                             translateX,translateY);
+        
         oneFrame(currentI);
         if (currentI>imax) stop();
 	}
     
 /*************I MADE CHANGES 7/24*****************/    
     //draw a parallelogram for each pair of points
-    function calligraphize(ctx, x, y, pressure) {
-        var penWidth = 32*pressure*ctx.lineWidth;
+    function calligraphize(x, y, pressure) {
+        var penWidth = 32*pressure*context.lineWidth;
         context.lineTo(x-penWidth,y+penWidth);
         context.lineTo(x,y);
         context.closePath();
@@ -166,18 +188,23 @@ var Grapher = function() {
         context.lineTo(x-penWidth,y+penWidth);
     }
     
-    var keyframes = {};
+//    var keyframes = {};
     
     //CHANGE TO WORK WITH NEW DATA!!!!
     function oneFrame(current){
         
+//        var keyframeTime = parseInt(current/5)*5;
+//        var keyframeID = String(keyframeTime);
+//        //FUZZY WHEN ZOOMED IN
+//        if(totalZoom > 1)
+//            keyframeTime = 0;
+//        while(keyframes[keyframeID] === undefined & keyframeTime !== 0) {
+//            keyframeTime -= 5;
+//            keyframeID = String(keyframeTime);
+//        }
+//        if(keyframeTime !== 0)
+//            context.drawImage(keyframes[keyframeID],0,0,c.width,c.height);
         var keyframeTime = 0;
-        var keyframeID = String(parseInt(current/10)*10);
-        //COP-OUT SOLUTION FOR FUZZY ZOOMING: REDRAW ALL STROKES WHEN ZOOMED IN
-        if(keyframes[keyframeID] !== undefined & totalZoom <= 1) {
-            context.drawImage(keyframes[keyframeID],0,0,c.width,c.height);
-            keyframeTime = parseInt(keyframeID);
-        }
         
         var dynamicStrokes = [];
         
@@ -225,7 +252,7 @@ var Grapher = function() {
                         var x=data[j].x*xscale;
                         var y=data[j].y*yscale;
                         var pressure = data[j].pressure;
-                        calligraphize(context,x,ymax*yscale-y,pressure);
+                        calligraphize(x,ymax*yscale-y,pressure);
                     }
                 }
                 
@@ -235,15 +262,15 @@ var Grapher = function() {
             }
         }
         
-        //saves a keyframe every 10 seconds
-        if(current % 10 < 1 & current >= 10) {
-            var newKeyframeID = String(parseInt(current));
-            if(keyframes[newKeyframeID] === undefined) {
-                var newKeyframe = new Image();
-                newKeyframe.src = c.toDataURL();
-                keyframes[newKeyframeID] = newKeyframe;
-            }
-        }
+        //saves a keyframe every 5 seconds
+//        if(current % 5 < 1 & current >= 5 & totalZoom === 1) {
+//            var newKeyframeID = String(parseInt(current));
+//            if(keyframes[newKeyframeID] === undefined) {
+//                var imgObj = new Image();
+//                imgObj.src = c.toDataURL();
+//                keyframes[newKeyframeID] = imgObj;
+//            }
+//        }
         
         //DRAW ALL TIME-CHANGING STROKES
         for(i in dynamicStrokes) {
@@ -294,7 +321,7 @@ var Grapher = function() {
                         var x=data[j].x*xscale;
                         var y=data[j].y*yscale;
                         var pressure = data[j].pressure;
-                        calligraphize(context,x,ymax*yscale-y,pressure);
+                        calligraphize(x,ymax*yscale-y,pressure);
                     }
                 }
                 
@@ -325,7 +352,10 @@ var Grapher = function() {
         setTime=true;
         offsetTime=pausedTime;
         currentI=val;
-		context.clearRect(0,0,c.width,c.height);
+//		context.clearRect(0,0,c.width,c.height);
+        c.width = c.width;
+        context.translate(translateX, translateY);
+        context.scale(totalZoom, totalZoom);
         oneFrame(val);
         changeSlider(val);
         if (isAudio) audio.currentTime=val;
@@ -391,7 +421,10 @@ var Grapher = function() {
         draw=clearInterval(draw);
         
         //I MADE CHANGES 7/24
-        context.clearRect(0,0,c.width,c.height);
+//        context.clearRect(0,0,c.width,c.height);
+        c.width = c.width;
+        context.translate(translateX, translateY);
+        context.scale(totalZoom, totalZoom);
         //7/25
         context.save();
         $('#slider-vertical').slider({disabled:true,value:1});
@@ -406,36 +439,6 @@ var Grapher = function() {
         audio.pause();
         if (isAudio) audio.currentTime=0;
         offsetTime=0;
-    }
-    
-    function jumpForward(){
-        jump(10);
-    }
-    
-    function jumpBack(){
-        jump(-10);
-    }
-    
-    function jump(val){
-        var initialpause=paused;
-        pause();
-        paused=initialpause;
-        var time=currentI+val;
-        if (time > imax) time = parseInt(imax);
-        if (time < 0) time=0;
-        currentI=time;
-        offsetTime=time*1000;
-        setTime=true;
-        
-        context.clearRect(0,0,c.width,c.height);
-        oneFrame(time);
-        changeSlider(time);
-        if (isAudio) audio.currentTime=time;
-        
-        if(!paused){ // if it wasn't paused, keep playing
-            paused=true; //it only starts if it was previously paused.
-            start();
-        }
     }
     
     function resizeControls(vidWidth){
@@ -484,7 +487,10 @@ var Grapher = function() {
         offsetTime=time*1000;
         setTime=true;
         
-        context.clearRect(0,0,c.width,c.height);
+//        context.clearRect(0,0,c.width,c.height);
+        c.width = c.width;
+        context.translate(translateX, translateY);
+        context.scale(totalZoom, totalZoom);
         oneFrame(time);
         changeSlider(time);
         if (isAudio) audio.currentTime=time;
@@ -600,6 +606,7 @@ var Grapher = function() {
         
 
 /*********************I MADE CHANGES 7/25********/
+        var prevX, prevY, prevZ;
         $('#slider-vertical').slider({
             disabled: true,
             orientation: 'vertical',
@@ -608,16 +615,24 @@ var Grapher = function() {
             max: 2,
             step: 0.1,
             value: 1,
-            slide: function(event, ui) {
+            start: function(event, ui) {
                 wasPanning = true;
+                prevX = translateX;
+                prevY = translateY;
+                prevZ = totalZoom;
+                console.log(translateX, translateY);
+            },
+            slide: function(event, ui) {
                 totalZoom = ui.value;
                 $('#zoomlabel').html(totalZoom);
-                context.clearRect(0,0,c.width,c.height);
-                context.setTransform(1,0,0,1,0,0);
+//                context.clearRect(0,0,c.width,c.height);
+                c.width = c.width;
+                translateX = prevX + (1-totalZoom/prevZ)*(c.width/2-prevX);
+                translateY = prevY + (1-totalZoom/prevZ)*(c.height/2-prevY);
                 context.translate(translateX, translateY);
-                context.translate((1-totalZoom)*(c.width/2-translateX),(1-totalZoom)*(c.height/2-translateY));
                 context.scale(totalZoom, totalZoom);
                 oneFrame(currentI);
+                console.log(translateX, translateY);
             }
         });
 /*********************END CHANGES****************/
@@ -651,10 +666,14 @@ var Grapher = function() {
         c.addEventListener('mousemove', function(e) {
             if(isPanning) {
                 wasPanning = true;
-                context.clearRect(0,0,c.width,c.height);
-                context.translate(e.x-previousX, e.y-previousY);
-                translateX += e.x-previousX;
-                translateY += e.y-previousY;
+//                context.clearRect(0,0,c.width,c.height);
+                c.width = c.width;
+                var newTx = (e.x-previousX);
+                var newTy = (e.y-previousY);
+                translateX += newTx;
+                translateY += newTy;
+                context.translate(translateX,translateY);
+                context.scale(totalZoom, totalZoom);
                 oneFrame(currentI);
                 previousX = e.x;
                 previousY = e.y;

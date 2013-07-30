@@ -16,7 +16,7 @@ var Grapher = function() {
     var previousX, previousY, previousZoom; //stand-in variables for many things
     var isDragging = false; //true if currently panning/zooming
     var wasDragging = false; //true if currently paused and panning/zooming
-    var dragToPan = true; //true if dragging to pan, false if dragging to zoom
+    var dragToPan = false; //true if dragging to pan, false if dragging to zoom
     var zoomRectW, zoomRectH;
     
     var audio;
@@ -74,10 +74,20 @@ var Grapher = function() {
     var numStrokes=0;
     var dataArray;
     
+    function preProcess(json) {
+        //invert y transforms
+        for(i in json.cameraTransforms) {
+            json.cameraTransforms[i].ty = -json.cameraTransforms[i].ty;
+        }
+        //simplify strokes, divide into similar-direction polygons
+        //get bounding box
+        return json;
+    }
+    
     // updates lines and dataPoints with new file
     function getData(file) {
         console.log(JSON.parse(file.responseText));
-        dataArray = JSON.parse(file.responseText);
+        dataArray = preProcess(JSON.parse(file.responseText));
         imax = dataArray.durationInSeconds;
         xmax=dataArray.width;
         ymax=dataArray.height;
@@ -129,9 +139,9 @@ var Grapher = function() {
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
-            currentI=time;
-            clearFrame();
-            oneFrame(time);
+//            currentI = time;
+//            clearFrame();
+//            oneFrame(time);
             changeSlider(time);
             if (isAudio) audio.currentTime=time;
         }
@@ -173,7 +183,6 @@ var Grapher = function() {
             }
             newTransform = jQuery.extend(true,{},previousTransform);
             if (nextTransform.time !== previousTransform.time) {
-                console.log(nextTransform.tx, previousTransform.tx);
                 var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
                 newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
                 newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
@@ -215,15 +224,16 @@ var Grapher = function() {
     //TESTING - entire stroke is one polygon
     //PROBLEM - split ends when stroke changes directions
     var path;
-    function test() {
+    function test(startIndex) {
         context.beginPath();
-        var point = path[0];
+        var point = path[startIndex];
+        var endIndex = path.length-1;
         context.moveTo(point[0],point[1]);
-        for(var i=1; i<path.length; i++) {
+        for(var i=startIndex+1; i<=endIndex; i++) {
             point = path[i];
             context.lineTo(point[0]+point[2],point[1]-point[2]);
         }
-        for(var i=path.length-1; i>-1; i--) {
+        for(var i=endIndex; i>=startIndex; i--) {
             point = path[i];
             context.lineTo(point[0]-point[2],point[1]+point[2]);
         }
@@ -299,7 +309,7 @@ var Grapher = function() {
                     
 //                    context.fill();
 //                    context.stroke();
-                    test();
+                    test(0);
                 }
             }
         }
@@ -403,8 +413,9 @@ var Grapher = function() {
                 previousY = e.y;
             }
             else {
-                zoomRectW = e.x-previousX;
-                zoomRectH = e.y-previousY;
+                var offset=root.find('.video').offset(); //array of left and top
+                zoomRectW = Math.max(offset.left, Math.min(e.x, offset.left+c.width))-previousX;
+                zoomRectH = Math.max(offset.top, Math.min(e.y, offset.top+c.height))-previousY;
                 if(zoomRectW/zoomRectH > c.width/c.height) //maintains aspect ratio of zoom region
                     zoomRectW = c.width/c.height*zoomRectH;
                 else
@@ -412,7 +423,6 @@ var Grapher = function() {
                 clearFrame();
                 oneFrame(currentI);
                 context.fillStyle = 'rgba(0,0,255,0.1)';
-                var offset=root.find('.video').offset(); //array of left and top
                 context.fillRect((previousX-offset.left-translateX)/totalZoom,
                                  (previousY-offset.top-translateY)/totalZoom,
                                  zoomRectW/totalZoom, zoomRectH/totalZoom);
@@ -421,30 +431,32 @@ var Grapher = function() {
     }
     
     //triggered when mouse released on canvas
-    function dragStop(e) {
-        isDragging = false;
-        var offset=root.find('.video').offset(); //array of left and top
-        
-        if(!dragToPan & wasDragging) { //zoom in on region
-            var nz = c.width/Math.abs(zoomRectW/totalZoom);
-            if(zoomRectW < 0)   previousX += zoomRectW; // upper left hand corner
-            if(zoomRectH < 0)   previousY += zoomRectH;
-            var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
-            var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
-            animateToPos(Date.now(), 200, nx, ny, nz, function() {
-                translateX = nx;
-                translateY = ny;
-                totalZoom = nz;
-                $('#slider-vertical').slider('value', totalZoom);
-                $('#zoomlabel').html(parseInt(totalZoom*10)/10);
-            });
-        }
-        
-        if(!wasDragging) { // click
-            paused = false;
-            previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
-            previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
-            selectStroke(previousX,previousY);
+    function dragStop() {
+        if(isDragging) {
+            isDragging = false;
+            var offset=root.find('.video').offset(); //array of left and top
+            
+            if(!dragToPan & wasDragging) { //zoom in on region
+                var nz = c.width/Math.abs(zoomRectW/totalZoom);
+                if(zoomRectW < 0)   previousX += zoomRectW; // upper left hand corner
+                if(zoomRectH < 0)   previousY += zoomRectH;
+                var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
+                var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
+                animateToPos(Date.now(), 200, nx, ny, nz, function() {
+                    translateX = nx;
+                    translateY = ny;
+                    totalZoom = nz;
+                    $('#slider-vertical').slider('value', totalZoom);
+                    $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+                });
+            }
+            
+            if(!wasDragging) { // click
+                paused = false;
+                previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
+                previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
+                selectStroke(previousX,previousY);
+            }
         }
     }
     
@@ -653,7 +665,7 @@ var Grapher = function() {
         
         $('.buttons').append('<button class="jumpBack"> < 10s </button>');
         $('.buttons').append('<button class="jumpForward"> 10s > </button>');
-        $('.buttons').append('<button class="toggleDrag"> Drag to Zoom </button>');
+        $('.buttons').append('<button class="toggleDrag"> Drag to Pan </button>');
         
         $('#slider').slider({
             max:100,
@@ -696,10 +708,27 @@ var Grapher = function() {
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-        c.addEventListener('mousedown', dragStart);
-        c.addEventListener('mousemove', dragging);
-        c.addEventListener('mouseup', dragStop);
-        c.addEventListener('mousewheel', function(e){console.log(e);});
+//        c.addEventListener('mousedown', dragStart);
+//        c.addEventListener('mousemove', dragging);
+//        c.addEventListener('mouseup', dragStop);
+        window.addEventListener('mousedown', function(e) {
+            var offset = root.find('.video').offset();
+            if(e.x > offset.left & e.x < offset.left + c.width &
+               e.y > offset.top & e.y < offset.top + c.height)
+                dragStart(e);
+        });
+        window.addEventListener('mousemove', dragging);
+        window.addEventListener('mouseup', dragStop);
+        c.addEventListener('mousewheel', function(e){
+            if(!wasDragging)
+                pause();
+            wasDragging = true;
+            console.log(e.wheelDeltaX, e.wheelDeltaY);
+            translateX += e.wheelDeltaX;
+            translateY += e.wheelDeltaY;
+            clearFrame();
+            oneFrame(currentI);
+        });
         
         readFile(datafile,getData); //dataPoints now filled with data
         

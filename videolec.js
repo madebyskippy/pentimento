@@ -114,7 +114,7 @@ var Grapher = function() {
     function selectStroke(x,y){
         x=x/xscale;
         y=(c.height-y)/yscale;
-        var minDistance=5; //if the point is further than this then ignore it
+        var minDistance=10; //if the point is further than this then ignore it
         var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
         for(var i=0; i<numStrokes; i++){
             var currentStroke=dataArray.visuals[i];
@@ -211,7 +211,9 @@ var Grapher = function() {
         $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         clearFrame();
         oneFrame(currentI);
-        if (currentI>imax) stop();
+        if (currentI>imax) {
+            stop();
+        }
 	}
     
     //draw a parallelogram for each pair of points
@@ -318,16 +320,20 @@ var Grapher = function() {
         }
     }
     
+    //turns total seconds into a timestamp of minute:seconds
+    //returns string
+    function secondsToTimestamp(totalseconds){
+        var minutes=Math.floor(totalseconds/60);
+        var seconds=Math.round(totalseconds - minutes * 60);
+        return minutes +":"+seconds;
+    }
+    
     function changeSlider(current){
         if (current<imax){ 
             $('#slider').slider('value',current);
-            //current is # of seconds...convert that to minutes & sec
             var secondsPassed=parseFloat(current);
-            var minutes=Math.floor(secondsPassed/60);
-            var seconds=Math.round((secondsPassed - minutes*60)*10)/10;
-            var zeros='';
-            if (seconds % 1 === 0 ) zeros='.0';
-            root.find('.time').html(minutes+":"+seconds+zeros);
+            root.find('.time').html(secondsToTimestamp(secondsPassed) + " / ");
+            root.find('.time').append(secondsToTimestamp(imax));
             
             //update ticks
             if (current > furthestpoint){
@@ -531,14 +537,16 @@ var Grapher = function() {
         draw=clearInterval(draw);
         
         furthestpoint=0;
-        translateX = 0;
-        translateY = 0;
-        totalZoom = 1;
-        clearFrame();
-        $('#slider-vertical').slider({disabled:true,value:1});
-        $('#zoomlabel').html(1);
-        $('#slider').slider('value', 0);
-        root.find('.time').html('0');
+//        translateX = 0;
+//        translateY = 0;
+//        totalZoom = 1;
+//        clearFrame();
+//        $('#slider-vertical').slider({disabled:true,value:1});
+//        $('#zoomlabel').html(1);
+//        $('#slider').slider('value', 0);
+//        root.find('.time').html('0');
+        
+        oneFrame(imax);
         
         audio.pause();
         if (isAudio) audio.currentTime=0;
@@ -609,7 +617,7 @@ var Grapher = function() {
     
     function resetControlSize(){
         $('.controls').css('width', '575px');
-        $('.buttons').css('width', '175px');
+        $('.buttons').css('width', '125');
         $('.pause').css('width','50px');
         $('.start').css('width','50px');
         $('.stop').css('width','50px');
@@ -661,7 +669,6 @@ var Grapher = function() {
         + "<div class='buttons'>"
         + "<input class='start' type='button'/>"
         + "<input class='pause' type='button'/>"
-        + "<input class='stop' type='button'/>"
         + "</div>"
         + "<div class='timeControls'>"
         + "<div id='slider'></div>"

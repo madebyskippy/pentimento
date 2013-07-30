@@ -22,8 +22,7 @@ var Grapher = function() {
     
     var furthestpoint=0; // furthest point in seconds
     
-    /*
-        **********the dataArray object****************
+    /***********the dataArray object****************
         durationInSeconds: number
         height: number
         width: number
@@ -108,7 +107,11 @@ var Grapher = function() {
         for(var i=0; i<numStrokes; i++){
             var currentStroke=dataArray.visuals[i];
             for(var j=0;j<currentStroke.vertices.length; j++){
-                if (currentStroke.vertices[j].t<currentI){
+                var deletedYet=false;
+                if (currentStroke.doesItGetDeleted){
+                    if (currentStroke.tDeletion<currentI) deletedYet=true;
+                }
+                if (currentStroke.vertices[j].t<currentI & !deletedYet){
                     //check closeness of x,y to this current point
                     var dist = getDistance(x,y,currentStroke.vertices[j].x,
                                            currentStroke.vertices[j].y)
@@ -304,6 +307,14 @@ var Grapher = function() {
         setTime=true;
         offsetTime=pausedTime;
         currentI=val;
+        
+        var newTransform = getTransform(currentI);
+        totalZoom = newTransform.m11;
+        translateX = newTransform.tx;
+        translateY = newTransform.ty;
+        $('#slider-vertical').slider('value', totalZoom);
+        $('#zoomlabel').html(totalZoom);
+        
         clearFrame();
         oneFrame(val);
         changeSlider(val);
@@ -649,6 +660,7 @@ var Grapher = function() {
 };
 
 
+//implements everything
 (function() {
     var createGrapher = function() {
         window.grapher = Grapher(jQuery);

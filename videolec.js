@@ -624,7 +624,7 @@ var Grapher = function() {
         $('.pause').css('background-size','50px');
         $('.start').css('background-size','50px');
         $('.stop').css('background-size','50px');
-        $('.timeControls').css('width','375px');
+        $('.timeControls').css('width','425px');
         $('#slider').css('width','300px');
         $('#slider').css('margin-top','20px');
         $('.zoomslider').css('height', '190px');

@@ -19,6 +19,10 @@ var Grapher = function() {
     var dragToPan = false; //true if dragging to pan, false if dragging to zoom
     var zoomRectW, zoomRectH;
     
+    //LIMITS ON THINGS
+    var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
+    var maxZoom = 1, minZoom = 1;
+    
     var audio;
     var isAudio=true;
     
@@ -76,10 +80,26 @@ var Grapher = function() {
     function preProcess(json) {
         //invert y transforms
         for(i in json.cameraTransforms) {
-            json.cameraTransforms[i].ty = -json.cameraTransforms[i].ty;
+            var transform = json.cameraTransforms[i];
+            transform.ty = -transform.ty;
+            if(transform.m11 > maxZoom) maxZoom = transform.m11;
+            if(transform.m11 < minZoom) minZoom = transform.m11;
         }
         //simplify strokes, divide into similar-direction polygons
         //get bounding box
+        for(i in json.visuals) {
+            var stroke = json.visuals[i].vertices;
+            for(j in stroke) {
+                var point = stroke[j];
+                if(point.x < boundingRect.xmin) boundingRect.xmin = point.x;
+                if(point.x > boundingRect.xmax) boundingRect.xmax = point.x;
+                if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
+                if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
+            }
+        }
+        boundingRect.ymin = -boundingRect.ymin;
+        boundingRect.ymax = -boundingRect.ymax;
+        console.log(boundingRect);
         return json;
     }
     
@@ -142,7 +162,7 @@ var Grapher = function() {
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
-//            currentI = time;
+            currentI = time;
 //            clearFrame();
 //            oneFrame(time);
             changeSlider(time);
@@ -190,8 +210,8 @@ var Grapher = function() {
                 newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
                 newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
                 newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
-                newTransform.tx = newTransform.tx/newTransform.m11;
-                newTransform.ty = newTransform.ty/newTransform.m11;
+                newTransform.tx = newTransform.tx/newTransform.m11*xscale;
+                newTransform.ty = newTransform.ty/newTransform.m11*yscale;
             }
         }
         
@@ -226,13 +246,12 @@ var Grapher = function() {
     
     //TESTING - entire stroke is one polygon
     //PROBLEM - split ends when stroke changes directions
-    var path;
-    function test(startIndex) {
+    function test(startIndex, path) {
         context.beginPath();
         var point = path[startIndex];
         var endIndex = path.length-1;
         context.moveTo(point[0],point[1]);
-        for(var i=startIndex+1; i<=endIndex; i++) {
+        for(var i=startIndex+1; i<path.length-1; i++) {
             point = path[i];
             context.lineTo(point[0]+point[2],point[1]-point[2]);
         }
@@ -258,7 +277,7 @@ var Grapher = function() {
              
 //                context.beginPath();
                 //TESTING
-                path = [];
+                var path = [];
                 
                 //process the properties
                 var properties= currentStroke.properties;
@@ -312,7 +331,7 @@ var Grapher = function() {
                     
 //                    context.fill();
 //                    context.stroke();
-                    test(0);
+                    test(0, path);
                 }
             }
         }
@@ -428,9 +447,9 @@ var Grapher = function() {
                 zoomRectW = Math.max(offset.left, Math.min(e.x, offset.left+c.width))-previousX;
                 zoomRectH = Math.max(offset.top, Math.min(e.y, offset.top+c.height))-previousY;
                 if(zoomRectW/zoomRectH > c.width/c.height) //maintains aspect ratio of zoom region
-                    zoomRectW = c.width/c.height*zoomRectH;
-                else
                     zoomRectH = c.height/c.width*zoomRectW;
+                else
+                    zoomRectW = c.width/c.height*zoomRectH;
                 clearFrame();
                 oneFrame(currentI);
                 context.fillStyle = 'rgba(0,0,255,0.1)';

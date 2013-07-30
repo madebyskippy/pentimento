@@ -589,6 +589,13 @@ var Grapher = function() {
         offsetTime=time*1000;
         setTime=true;
         
+        var newTransform = getTransform(currentI);
+        totalZoom = newTransform.m11;
+        translateX = newTransform.tx;
+        translateY = newTransform.ty;
+        $('#slider-vertical').slider('value', totalZoom);
+        $('#zoomlabel').html(totalZoom);
+        
         clearFrame();
         oneFrame(time);
         changeSlider(time);

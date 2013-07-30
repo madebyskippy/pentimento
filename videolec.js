@@ -673,7 +673,9 @@ var Grapher = function() {
         + "</div>"
         + "</div>";
     exports.initialize = function() {
-        root = $("<div class='pentimento'></div>").appendTo($('body'));
+        //root = $("<div class='pentimento'></div>").appendTo($('body'));
+        //root.append(template);
+        root=$('.pentimento');
         root.append(template);
         
         audio=root.find('.audio')[0];
@@ -719,7 +721,6 @@ var Grapher = function() {
         });
         
         c=root.find('.video')[0];
-        
         resizeVisuals();
         
         context=c.getContext('2d');

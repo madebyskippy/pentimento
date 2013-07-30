@@ -14,13 +14,13 @@ body{
 }
 
 .controls{
-    width:575px;
+    width:425px;
     height:60px;
 }
 
 .buttons{
     float:left;
-    width:175px;
+    width:125px;
 }
 
 input[type='button']{
@@ -64,12 +64,12 @@ input[type='button']:focus{
 }
 
 #slider .ui-slider-handle {
-    width: .1em;
+    width: .6em;
     border: none;
-    background: #fff;
+    background: #999;
     height: 100%;
     top: 0;
-    margin-left: -.05em;
+    margin-left: -.3em;
 }
 
 .pause{

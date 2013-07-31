@@ -108,7 +108,7 @@ var Grapher = function() {
         boundingRect.width = boundingRect.xmax - boundingRect.xmin;
         boundingRect.height = boundingRect.ymax - boundingRect.ymin;
         console.log(boundingRect);
-        minZoom = json.width/boundingRect.width;
+        minZoom = Math.min(json.width/boundingRect.width,json.height/boundingRect.height);
         $('#zoomslider').slider({min: minZoom});
         resizeVisuals();
         return json;
@@ -190,8 +190,8 @@ var Grapher = function() {
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, c.width, c.height);
         
-            translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale);
-            translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
+        translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale);
+        translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
         
         // Restore the transform
         context.setTransform(totalZoom,0,0,totalZoom,
@@ -590,7 +590,6 @@ var Grapher = function() {
         
         $('#slider').css('width',vidWidth/2-10);
         $('#slider').css('margin-top',buttonWidths/2);
-        //I MADE CHANGES 7/25
         $('.sidecontrols').css('height',2*vidWidth/3);
         
         $('.time').css('margin-top',buttonWidths/2);
@@ -680,6 +679,12 @@ var Grapher = function() {
             resizeControls(c.width);
         }
         else { resetControlSize(); }
+        $('.sidecontrols').css({position: 'absolute',
+                                top: ($('.video').offset().top+'px'),
+                                left: (($('.video').offset().left+$('.video').width()+10)+'px')});
+        $('.controls').css({position: 'absolute',
+                            top: (($('.video').offset().top+$('.video').height()+10)+'px'),
+                            left: ($('.video').offset().left+'px')})
     }
     
     var template="<a href='index.html'>index</a><br><div class='lecture'>"
@@ -788,7 +793,32 @@ var Grapher = function() {
             }
         });
         
-        root.find('.pause').on('click',pause);
+        $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
+        $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
+        $('.sidecontrols').css('position', 'absolute');
+        $('#revertPos').on('click', function () {
+            if(!paused) pause();
+            var next = getTransform(currentI);
+            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function() {
+                translateX=next.tx;
+                translateY=next.ty;
+                totalZoom=next.m11;
+                clearFrame();
+                oneFrame(currentI);
+            });
+        });
+        $('#seeAll').on('click', function() {
+            if(!paused) pause();
+            animateToPos(Date.now(), 200, 0, 0, minZoom, function() {
+                translateX=0;
+                translateY=0;
+                totalZoom=minZoom;
+                clearFrame();
+                oneFrame(currentI);
+            });
+        });
+        
+        root.find('.pause').on('click',function() {if(!paused) pause();});
         root.find('.start').on('click',function() {
             if(paused) {
                 var next = getTransform(currentI);

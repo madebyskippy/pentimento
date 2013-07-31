@@ -19,6 +19,7 @@ var Grapher = function() {
     var dragToPan = false; //true if dragging to pan, false if dragging to zoom
     var zoomRectW = 0, zoomRectH = 0;
     var offset;
+    var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     
     //LIMITS ON THINGS
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
@@ -186,6 +187,22 @@ var Grapher = function() {
         }
     }
     
+    function drawScrollBars(tx, ty, z) {
+        context.beginPath();
+        context.strokeStyle = 'rgba(0,0,0,0.3)';
+        context.lineCap = 'round';
+        context.lineWidth = 8;
+        scrollBarWidth = xmax/boundingRect.width/z*c.width-20;
+        scrollBarLeft = (-tx-boundingRect.xmin*xscale)/boundingRect.width/xscale/z*c.width+10;
+        context.moveTo(scrollBarLeft, c.height-10);
+        context.lineTo(scrollBarLeft+scrollBarWidth, c.height-10);
+        scrollBarHeight = ymax/boundingRect.height/z*c.height-20;
+        scrollBarTop = (-ty-boundingRect.ymin*yscale)/boundingRect.height/yscale/z*c.height+10;
+        context.moveTo(c.width-10, scrollBarTop);
+        context.lineTo(c.width-10, scrollBarTop+scrollBarHeight);
+        context.stroke();
+    }
+    
     function clearFrame() {
         // Use the identity matrix while clearing the canvas
         context.setTransform(1, 0, 0, 1, 0, 0);
@@ -193,6 +210,11 @@ var Grapher = function() {
         
         translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale);
         translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
+        totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
+        
+        if(paused) {
+            drawScrollBars(translateX, translateY, totalZoom);
+        }
         
         // Restore the transform
         context.setTransform(totalZoom,0,0,totalZoom,
@@ -409,7 +431,7 @@ var Grapher = function() {
     
     //triggered when zoom slider is changed
     function zooming(event, ui) {
-        totalZoom = ui.value;
+        totalZoom = Math.max(minZoom, Math.min(ui.value, maxZoom));
         $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         //zoom in on center of visible portion achieved by extra translations
         translateX = previousX + (1-totalZoom/previousZoom)*(c.width/2-previousX);
@@ -513,10 +535,16 @@ var Grapher = function() {
             callback();
         }
         else {
-            c.width = c.width;
+            // Use the identity matrix while clearing the canvas
+            context.setTransform(1, 0, 0, 1, 0, 0);
+            context.clearRect(0, 0, c.width, c.height);
+            
             var newZoom = totalZoom + (nz - totalZoom)*interpolatedTime;
             var newX = translateX + (nx - translateX)*interpolatedTime;
             var newY = translateY + (ny - translateY)*interpolatedTime;
+            
+            drawScrollBars(newX, newY, newZoom);
+            
             context.setTransform(newZoom,0,0,newZoom,
                                  newX,newY);
             oneFrame(currentI);
@@ -763,21 +791,45 @@ var Grapher = function() {
         c.addEventListener('mousewheel', function(e){
             if(!wasDragging)
                 pause();
+            if(dragToPan) {
+                var scroll = e.wheelDeltaY;
+                if(e.shiftKey)
+                    scroll = e.wheelDeltaX;
+                if(scroll !== 0) {
+                    zoomStart();
+                    zooming('trash', {value: totalZoom+0.1*scroll/Math.abs(scroll)});
+                    $('#zoomslider').slider('value', totalZoom);
+                }
+            }
+            else
+                pan(e.wheelDeltaX, e.wheelDeltaY);
             wasDragging = true;
-            pan(e.wheelDeltaX, e.wheelDeltaY);
         });
         
         readFile(datafile,getData); //dataPoints now filled with data
-        
-        resizeVisuals();
         
         root.find('.jumpForward').on('click',jumpForward);
         root.find('.jumpBack').on('click',jumpBack);
         root.find('#toggleDrag').slider({
             orientation: 'vertical',
-            min: 0, max: 1, step: 1, value: 0,
+            min: -1, max: 1, step: 2, value: -1,
             slide: function(e, ui) {
-                dragToPan = ui.value === 1;
+                dragToPan = ui.value > 0;
+            }
+        });
+        
+        window.addEventListener('keydown', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16) {
+                root.find('#toggleDrag').slider({value: 1, disabled: true});
+                dragToPan = true;
+            }
+        });
+        window.addEventListener('keyup', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16) {
+                root.find('#toggleDrag').slider({value: -1, disabled: false});
+                dragToPan = false;
             }
         });
         

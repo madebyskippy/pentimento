@@ -124,6 +124,7 @@ var Grapher = function() {
         console.log("imax: "+imax);
         $('#slider').slider("option","max",imax);
         slider.max=imax;
+        $('#totalTime').html(secondsToTimestamp(imax));
         numStrokes=dataArray.visuals.length;
     }
 
@@ -341,15 +342,17 @@ var Grapher = function() {
     function secondsToTimestamp(totalseconds){
         var minutes=Math.floor(totalseconds/60);
         var seconds=Math.round(totalseconds - minutes * 60);
-        return minutes +":"+seconds;
+        var zeros='';
+        if (seconds < 10) zeros='0';
+        return minutes +":"+seconds+zeros;
     }
     
     function changeSlider(current){
         if (current<imax){ 
             $('#slider').slider('value',current);
             var secondsPassed=parseFloat(current);
-            root.find('.time').html(secondsToTimestamp(secondsPassed) + " / ");
-            root.find('.time').append(secondsToTimestamp(imax));
+            root.find('.time').html(secondsToTimestamp(secondsPassed));
+            //root.find('.time').append(secondsToTimestamp(imax));
             
             //update ticks
             if (current > furthestpoint){
@@ -557,45 +560,12 @@ var Grapher = function() {
         draw=clearInterval(draw);
         
         furthestpoint=0;
-//        translateX = 0;
-//        translateY = 0;
-//        totalZoom = 1;
-//        clearFrame();
-//        $('#zoomslider').slider({disabled:true,value:1});
-//        $('#zoomlabel').html(1);
-//        $('#slider').slider('value', 0);
-//        root.find('.time').html('0');
         
         oneFrame(imax);
         
         audio.pause();
         if (isAudio) audio.currentTime=0;
         offsetTime=0;
-    }
-    
-    function resizeControls(vidWidth){
-        
-        $('.controls').css('width', vidWidth);
-        
-        var buttonWidths=parseInt((vidWidth/4-20)/3);
-        $('.buttons').css('width', vidWidth/4);
-        $('.pause').css('width',buttonWidths);
-        $('.start').css('width',buttonWidths);
-        $('.stop').css('width',buttonWidths);
-        $('.pause').css('background-size',buttonWidths);
-        $('.start').css('background-size',buttonWidths);
-        $('.stop').css('background-size',buttonWidths);
-        
-        $('.timeControls').css('width',vidWidth/4*3);
-        
-        $('#slider').css('width',vidWidth/2-10);
-        $('#slider').css('margin-top',buttonWidths/2);
-        $('.sidecontrols').css('height',2*vidWidth/3);
-        
-        $('.time').css('margin-top',buttonWidths/2);
-        
-        clearFrame();
-        oneFrame(currentI);
     }
     
     function jumpForward(){
@@ -635,15 +605,37 @@ var Grapher = function() {
         }
     }
     
+    function resizeControls(vidWidth){
+        
+        $('.controls').css('width', vidWidth);
+        
+        var buttonWidths=parseInt(vidWidth* 50 / 575);
+        if (buttonWidths > 50 ) buttonWidths=50;
+        $('.buttons').css('width', buttonWidths+5);
+        $('.start').css('width',buttonWidths);
+        $('.start').css('background-size',buttonWidths);
+        $('.jumpForward').css('width',buttonWidths/2-2);
+        $('.jumpBack').css('width',buttonWidths/2-2);
+        
+        var timeControlWidth=parseInt(vidWidth)-buttonWidths-25;
+        $('.timeControls').css('width',timeControlWidth);
+        $('#slider').css('width',timeControlWidth-150);
+        $('#slider').css('margin-top',buttonWidths/2);
+        $('.time').css('margin-top',buttonWidths/2);
+        $('#totalTime').css('margin-top',buttonWidths/2);
+        
+        
+        $('.sidecontrols').css('height',2*vidWidth/3);
+        
+        clearFrame();
+        oneFrame(currentI);
+    }
+    
     function resetControlSize(){
         $('.controls').css('width', '575px');
-        $('.buttons').css('width', '125');
-        $('.pause').css('width','50px');
+        $('.buttons').css('width', '60px');
         $('.start').css('width','50px');
-        $('.stop').css('width','50px');
-        $('.pause').css('background-size','50px');
         $('.start').css('background-size','50px');
-        $('.stop').css('background-size','50px');
         $('.timeControls').css('width','425px');
         $('#slider').css('width','300px');
         $('#slider').css('margin-top','20px');
@@ -675,10 +667,11 @@ var Grapher = function() {
         yscale=(c.height)/ymax;
         xscale=(c.width)/xmax;
         offset = root.find('.video').offset();
-        if (c.width<575) {
-            resizeControls(c.width);
-        }
-        else { resetControlSize(); }
+        resizeControls(c.width);
+//        if (c.width<575) {
+//            resizeControls(c.width);
+//        }
+//        else { resetControlSize(); }
         $('.sidecontrols').css({position: 'absolute',
                                 top: ($('.video').offset().top+'px'),
                                 left: (($('.video').offset().left+$('.video').width()+10)+'px')});
@@ -687,7 +680,7 @@ var Grapher = function() {
                             left: ($('.video').offset().left+'px')})
     }
     
-    var template="<a href='index.html'>index</a><br><div class='lecture'>"
+    var template="<a href='index.html'>back to menu</a><br><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='sidecontrols'>"
         + "+<div id='zoomslider'></div>-"
@@ -697,11 +690,11 @@ var Grapher = function() {
         + "<br> <div class='controls'>"
         + "<div class='buttons'>"
         + "<input class='start' type='button'/>"
-        + "<input class='pause' type='button'/>"
         + "</div>"
         + "<div class='timeControls'>"
+        + "<div class='time'>0:0</div>"
         + "<div id='slider'></div>"
-        + "<div class='time'>0</div>"
+        + "<div id='totalTime'></div>"
         + "</div>"
         + "<audio class='audio' preload='auto'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
@@ -719,9 +712,8 @@ var Grapher = function() {
         source.attr('src',audioSource).appendTo(source.parent());
         if (audioSource == '' ) isAudio=false;
         
-        $('.buttons').append('<button class="jumpBack"> < 10s </button>');
-        $('.buttons').append('<button class="jumpForward"> 10s > </button>');
-//        $('.buttons').append('<button class="toggleDrag"> Drag to Pan </button>');
+        $('.buttons').append('<button class="jumpBack"> < </button>');
+        $('.buttons').append('<button class="jumpForward"> > </button>');
         
         $('#slider').slider({
             max:100,
@@ -777,14 +769,10 @@ var Grapher = function() {
         
         readFile(datafile,getData); //dataPoints now filled with data
         
-//        resizeVisuals();
+        resizeVisuals();
         
         root.find('.jumpForward').on('click',jumpForward);
         root.find('.jumpBack').on('click',jumpBack);
-//        root.find('.toggleDrag').on('click', function() {
-//            dragToPan = !dragToPan;
-//            this.innerHTML = dragToPan?"Drag to Zoom":"Drag to Pan";
-//        });
         root.find('#toggleDrag').slider({
             orientation: 'vertical',
             min: 0, max: 1, step: 1, value: 0,
@@ -817,15 +805,27 @@ var Grapher = function() {
                 oneFrame(currentI);
             });
         });
-        
-        root.find('.pause').on('click',function() {if(!paused) pause();});
+                
         root.find('.start').on('click',function() {
             if(paused) {
+                root.find('.start').css('background-image',
+                    "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
                 var next = getTransform(currentI);
                 animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, start);
             }
+            else {
+                root.find('.start').css('background-image',
+                    "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+                pause();
+            }
         });
-        root.find('.stop').on('click',stop);
+        
+        $('body').on('keypress',function(event){
+            if (event.keyCode==32){ // space was pressed
+                //trigger button click
+                root.find('.start').click();
+            }
+        });
         
         $(window).on('resize',resizeVisuals);
     }

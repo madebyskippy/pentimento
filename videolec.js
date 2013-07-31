@@ -125,7 +125,7 @@ var Grapher = function() {
         console.log("imax: "+imax);
         $('#slider').slider("option","max",imax);
         slider.max=imax;
-        $('#totalTime').html(secondsToTimestamp(imax));
+        $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         numStrokes=dataArray.visuals.length;
     }
 
@@ -366,7 +366,7 @@ var Grapher = function() {
         var seconds=Math.round(totalseconds - minutes * 60);
         var zeros='';
         if (seconds < 10) zeros='0';
-        return minutes +":"+seconds+zeros;
+        return minutes +":"+zeros+seconds;
     }
     
     function changeSlider(current){
@@ -375,6 +375,9 @@ var Grapher = function() {
             var secondsPassed=parseFloat(current);
             root.find('.time').html(secondsToTimestamp(secondsPassed));
             //root.find('.time').append(secondsToTimestamp(imax));
+            
+            root.find('#totalTime').html(secondsToTimestamp(secondsPassed)+" / ");
+            root.find('#totalTime').append(secondsToTimestamp(imax));
             
             //update ticks
             if (current > furthestpoint){
@@ -559,6 +562,9 @@ var Grapher = function() {
         if(paused){
             $('#zoomslider').slider({disabled:true});
             wasDragging = false;
+            root.find('.start').css('background-image',
+                "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
+            $('#slider .ui-slider-handle').css('background','#0b0');
             
             paused=false;
             setTime=false;
@@ -570,6 +576,9 @@ var Grapher = function() {
     
     function pause(){
         $('#zoomslider').slider({disabled:false});
+        root.find('.start').css('background-image',
+            "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+        $('#slider .ui-slider-handle').css('background','#f55');
         
         paused=true;
         draw=clearInterval(draw);
@@ -659,19 +668,6 @@ var Grapher = function() {
         oneFrame(currentI);
     }
     
-    function resetControlSize(){
-        $('.controls').css('width', '575px');
-        $('.buttons').css('width', '60px');
-        $('.start').css('width','50px');
-        $('.start').css('background-size','50px');
-        $('.timeControls').css('width','425px');
-        $('#slider').css('width','300px');
-        $('#slider').css('margin-top','20px');
-        $('.sidecontrols').css('height', '380px');
-        $('.time').css('margin-top','20px');
-        clearFrame();
-        oneFrame(currentI);
-    }
     
     function resizeVisuals(){
         var c=$('.pentimento').find('.video')[0];
@@ -720,7 +716,7 @@ var Grapher = function() {
         + "<input class='start' type='button'/>"
         + "</div>"
         + "<div class='timeControls'>"
-        + "<div class='time'>0:0</div>"
+//        + "<div class='time'>0:0</div>"
         + "<div id='slider'></div>"
         + "<div id='totalTime'></div>"
         + "</div>"
@@ -860,14 +856,10 @@ var Grapher = function() {
                 
         root.find('.start').on('click',function() {
             if(paused) {
-                root.find('.start').css('background-image',
-                    "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
                 var next = getTransform(currentI);
                 animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, start);
             }
             else {
-                root.find('.start').css('background-image',
-                    "url('http://web.mit.edu/lilis/www/videolec/play.png')");
                 pause();
             }
         });

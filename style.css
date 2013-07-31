@@ -120,8 +120,9 @@ input[type='button']:focus{
 }
 
 #totalTime{
+    margin-top:20px;
     float:right;
-    width: 50px;
+    width: 100px;
 }
 
 .jumpBack{

@@ -620,9 +620,9 @@ var Grapher = function() {
         var timeControlWidth=parseInt(vidWidth)-buttonWidths-25;
         $('.timeControls').css('width',timeControlWidth);
         $('#slider').css('width',timeControlWidth-150);
-        $('#slider').css('margin-top',buttonWidths/2);
-        $('.time').css('margin-top',buttonWidths/2);
-        $('#totalTime').css('margin-top',buttonWidths/2);
+        $('#slider').css('margin-top',buttonWidths/2-5);
+        $('.time').css('margin-top',buttonWidths/2-5);
+        $('#totalTime').css('margin-top',buttonWidths/2-5);
         
         
         $('.sidecontrols').css('height',2*vidWidth/3);

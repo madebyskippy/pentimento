@@ -17,11 +17,12 @@ var Grapher = function() {
     var isDragging = false; //true if currently panning/zooming
     var wasDragging = false; //true if currently paused and panning/zooming
     var dragToPan = false; //true if dragging to pan, false if dragging to zoom
-    var zoomRectW, zoomRectH;
+    var zoomRectW = 0, zoomRectH = 0;
+    var offset;
     
     //LIMITS ON THINGS
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
-    var maxZoom = 1, minZoom = 1;
+    var maxZoom = 4, minZoom = 1;
     
     var audio;
     var isAudio=true;
@@ -78,28 +79,38 @@ var Grapher = function() {
     var dataArray;
     
     function preProcess(json) {
-        //invert y transforms
-        for(i in json.cameraTransforms) {
-            var transform = json.cameraTransforms[i];
-            transform.ty = -transform.ty;
-            if(transform.m11 > maxZoom) maxZoom = transform.m11;
-            if(transform.m11 < minZoom) minZoom = transform.m11;
-        }
         //simplify strokes, divide into similar-direction polygons
         //get bounding box
+        boundingRect.xmax = json.width;
+        boundingRect.ymax = json.height;
         for(i in json.visuals) {
             var stroke = json.visuals[i].vertices;
             for(j in stroke) {
                 var point = stroke[j];
+                point.y = json.height-point.y;
                 if(point.x < boundingRect.xmin) boundingRect.xmin = point.x;
                 if(point.x > boundingRect.xmax) boundingRect.xmax = point.x;
                 if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
                 if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
             }
         }
-        boundingRect.ymin = -boundingRect.ymin;
-        boundingRect.ymax = -boundingRect.ymax;
+        //invert y transforms
+        for(i in json.cameraTransforms) {
+            var transform = json.cameraTransforms[i];
+            transform.ty = -transform.ty;
+            if(transform.m11 > maxZoom) maxZoom = transform.m11;
+            if(transform.m11 < minZoom) minZoom = transform.m11;
+            if(-transform.tx < boundingRect.xmin) boundingRect.xmin = -transform.tx;
+            if(-transform.tx > boundingRect.xmax - json.width) boundingRect.xmax = json.width-transform.tx;
+            if(-transform.ty < boundingRect.ymin) boundingRect.ymin = -transform.ty;
+            if(-transform.ty > boundingRect.ymax - json.height) boundingRect.ymax = json.height-transform.ty;
+        }
+        boundingRect.width = boundingRect.xmax - boundingRect.xmin;
+        boundingRect.height = boundingRect.ymax - boundingRect.ymin;
         console.log(boundingRect);
+        minZoom = json.width/boundingRect.width;
+        $('#slider-vertical').slider({min: minZoom});
+        resizeVisuals();
         return json;
     }
     
@@ -110,7 +121,6 @@ var Grapher = function() {
         imax = dataArray.durationInSeconds;
         xmax=dataArray.width;
         ymax=dataArray.height;
-        resizeVisuals();
         console.log("imax: "+imax);
         $('#slider').slider("option","max",imax);
         slider.max=imax;
@@ -133,7 +143,7 @@ var Grapher = function() {
     //called when you click on the canvas
     function selectStroke(x,y){
         x=x/xscale;
-        y=(c.height-y)/yscale;
+        y=y/yscale;
         var minDistance=10; //if the point is further than this then ignore it
         var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
         for(var i=0; i<numStrokes; i++){
@@ -170,7 +180,8 @@ var Grapher = function() {
         }
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
-            start();
+            var next = getTransform(currentI);
+            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, start);
         }
     }
     
@@ -178,6 +189,9 @@ var Grapher = function() {
         // Use the identity matrix while clearing the canvas
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, c.width, c.height);
+        
+            translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale);
+            translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
         
         // Restore the transform
         context.setTransform(totalZoom,0,0,totalZoom,
@@ -210,9 +224,9 @@ var Grapher = function() {
                 newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
                 newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
                 newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
-                newTransform.tx = newTransform.tx/newTransform.m11*xscale;
-                newTransform.ty = newTransform.ty/newTransform.m11*yscale;
             }
+            newTransform.tx = newTransform.tx/newTransform.m11*xscale;
+            newTransform.ty = newTransform.ty/newTransform.m11*yscale;
         }
         
         return newTransform;
@@ -236,19 +250,9 @@ var Grapher = function() {
         }
 	}
     
-    //draw a parallelogram for each pair of points
-    function calligraphize(x, y, pressure) {
-        var penWidth = 32*pressure*context.lineWidth;
-        context.lineTo(x-penWidth/2,y+penWidth/2);
-        context.lineTo(x+penWidth/2,y-penWidth/2);
-        context.closePath();
-        context.moveTo(x+penWidth/2,y-penWidth/2);
-        context.lineTo(x-penWidth/2,y+penWidth/2);
-    }
-    
-    //TESTING - entire stroke is one polygon
-    //PROBLEM - split ends when stroke changes directions
-    function test(startIndex, path) {
+    //draw polygon for each stroke
+    //TODO: break stroke into portions
+    function calligraphize(startIndex, path) {
         context.beginPath();
         var point = path[startIndex];
         var endIndex = path.length-1;
@@ -277,8 +281,6 @@ var Grapher = function() {
             if(tmin < current){
                 var data = currentStroke.vertices;
              
-//                context.beginPath();
-                //TESTING
                 var path = [];
                 
                 //process the properties
@@ -325,15 +327,10 @@ var Grapher = function() {
                             var x=data[j].x*xscale;
                             var y=data[j].y*yscale;
                             var pressure = data[j].pressure;
-//                            calligraphize(x,ymax*yscale-y,pressure);
-                            //TESTING
-                            path.push([x,ymax*yscale-y,pressure*context.lineWidth*16]);
+                            path.push([x,y,pressure*context.lineWidth*16]);
                         }
                     }
-                    
-//                    context.fill();
-//                    context.stroke();
-                    test(0, path);
+                    calligraphize(0, path);
                 }
             }
         }
@@ -376,8 +373,7 @@ var Grapher = function() {
         translateX = newTransform.tx;
         translateY = newTransform.ty;
         $('#slider-vertical').slider('value', totalZoom);
-        $('#zoomlabel').html(totalZoom);
-        
+        $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         clearFrame();
         oneFrame(val);
         changeSlider(val);
@@ -419,6 +415,13 @@ var Grapher = function() {
         oneFrame(currentI);
     }
     
+    function pan(dx, dy) {
+        translateX += dx;
+        translateY += dy;
+        clearFrame();
+        oneFrame(currentI);
+    }
+    
     //triggered when mouse pressed on canvas
     function dragStart(e) {
         isDragging = true;
@@ -427,11 +430,6 @@ var Grapher = function() {
         if(!wasDragging)
             pause(); // only pauses the first time
         wasDragging = false;
-        
-        if(!dragToPan) { //tracking zoom region
-            zoomRectW = 0;
-            zoomRectH = 0;
-        }
     }
     
     //triggered when mouse dragged across canvas
@@ -441,15 +439,11 @@ var Grapher = function() {
             if(dragToPan) {
                 var newTx = (e.x-previousX);
                 var newTy = (e.y-previousY);
-                translateX += newTx;
-                translateY += newTy;
-                clearFrame();
-                oneFrame(currentI);
+                pan(newTx, newTy);
                 previousX = e.x;
                 previousY = e.y;
             }
             else {
-                var offset=root.find('.video').offset(); //array of left and top
                 zoomRectW = Math.max(offset.left, Math.min(e.x, offset.left+c.width))-previousX;
                 zoomRectH = Math.max(offset.top, Math.min(e.y, offset.top+c.height))-previousY;
                 if(zoomRectW/zoomRectH > c.width/c.height) //maintains aspect ratio of zoom region
@@ -470,21 +464,28 @@ var Grapher = function() {
     function dragStop() {
         if(isDragging) {
             isDragging = false;
-            var offset=root.find('.video').offset(); //array of left and top
             
             if(!dragToPan & wasDragging) { //zoom in on region
                 var nz = c.width/Math.abs(zoomRectW/totalZoom);
-                if(zoomRectW < 0)   previousX += zoomRectW; // upper left hand corner
-                if(zoomRectH < 0)   previousY += zoomRectH;
-                var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
-                var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
-                animateToPos(Date.now(), 200, nx, ny, nz, function() {
-                    translateX = nx;
-                    translateY = ny;
-                    totalZoom = nz;
-                    $('#slider-vertical').slider('value', totalZoom);
-                    $('#zoomlabel').html(parseInt(totalZoom*10)/10);
-                });
+                if(nz < maxZoom) {
+                    if(zoomRectW < 0)   previousX += zoomRectW; // upper left hand corner
+                    if(zoomRectH < 0)   previousY += zoomRectH;
+                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
+                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
+                    nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
+                    ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
+                    animateToPos(Date.now(), 200, nx, ny, nz, function() {
+                        translateX = nx;
+                        translateY = ny;
+                        totalZoom = nz;
+                    });
+                }
+                else {
+                    clearFrame();
+                    oneFrame(currentI);
+                }
+                zoomRectW = 0;
+                zoomRectH = 0;
             }
             
             if(!wasDragging) { // click
@@ -498,18 +499,21 @@ var Grapher = function() {
     
     //animates back to playing position before playing
     function animateToPos(startTime, duration, nx, ny, nz, callback) {
+        nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
+        ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
+        
         var interpolatedTime = (Date.now() - startTime)/duration;
         
         if(interpolatedTime > 1 | (translateX === nx & translateY === ny & totalZoom === nz)) {
-            $('#slider-vertical').slider('value', totalZoom);
-            $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+            $('#slider-vertical').slider('value', nz);
+            $('#zoomlabel').html(parseInt(nz*10)/10);
             callback();
         }
         else {
             c.width = c.width;
             var newZoom = totalZoom + (nz - totalZoom)*interpolatedTime;
-            var newX = (translateX + (nx - translateX)*interpolatedTime);
-            var newY = (translateY + (ny - translateY)*interpolatedTime);
+            var newX = translateX + (nx - translateX)*interpolatedTime;
+            var newY = translateY + (ny - translateY)*interpolatedTime;
             context.setTransform(newZoom,0,0,newZoom,
                                  newX,newY);
             oneFrame(currentI);
@@ -525,14 +529,11 @@ var Grapher = function() {
             $('#slider-vertical').slider({disabled:true});
             wasDragging = false;
             
-            var next = getTransform(currentI);
-            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function() {
-                paused=false;
-                setTime=false;
-                initialTime=Date.now()-offsetTime;
-                draw=setInterval(graphData,50);
-                audio.play();
-            });
+            paused=false;
+            setTime=false;
+            initialTime=Date.now()-offsetTime;
+            draw=setInterval(graphData,50);
+            audio.play();
         }
     }
     
@@ -594,6 +595,7 @@ var Grapher = function() {
         
         $('.time').css('margin-top',buttonWidths/2);
         
+        clearFrame();
         oneFrame(currentI);
     }
     
@@ -615,13 +617,13 @@ var Grapher = function() {
         currentI=time;
         offsetTime=time*1000;
         setTime=true;
-        
+            
         var newTransform = getTransform(currentI);
         totalZoom = newTransform.m11;
         translateX = newTransform.tx;
         translateY = newTransform.ty;
         $('#slider-vertical').slider('value', totalZoom);
-        $('#zoomlabel').html(totalZoom);
+        $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         
         clearFrame();
         oneFrame(time);
@@ -648,6 +650,7 @@ var Grapher = function() {
         $('#slider').css('margin-top','20px');
         $('.zoomslider').css('height', '190px');
         $('.time').css('margin-top','20px');
+        clearFrame();
         oneFrame(currentI);
     }
     
@@ -672,6 +675,7 @@ var Grapher = function() {
         c.width=xmax * videoDim/scaleFactor;
         yscale=(c.height)/ymax;
         xscale=(c.width)/xmax;
+        offset = root.find('.video').offset();
         if (c.width<575) {
             resizeControls(c.width);
         }
@@ -738,8 +742,8 @@ var Grapher = function() {
             disabled: true,
             orientation: 'vertical',
             range: 'min',
-            min: 0.5,
-            max: 2,
+            min: minZoom,
+            max: maxZoom,
             step: 0.1,
             value: 1,
             start: zoomStart,
@@ -747,19 +751,13 @@ var Grapher = function() {
         });
         
         c=root.find('.video')[0];
-        resizeVisuals();
         
         context=c.getContext('2d');
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-//        c.addEventListener('mousedown', dragStart);
-//        c.addEventListener('mousemove', dragging);
-//        c.addEventListener('mouseup', dragStop);
         window.addEventListener('mousedown', function(e) {
-            var offset = root.find('.video').offset();
-            if(e.x > offset.left & e.x < offset.left + c.width &
-               e.y > offset.top & e.y < offset.top + c.height)
+            if(e.target === c)
                 dragStart(e);
         });
         window.addEventListener('mousemove', dragging);
@@ -768,14 +766,12 @@ var Grapher = function() {
             if(!wasDragging)
                 pause();
             wasDragging = true;
-            console.log(e.wheelDeltaX, e.wheelDeltaY);
-            translateX += e.wheelDeltaX;
-            translateY += e.wheelDeltaY;
-            clearFrame();
-            oneFrame(currentI);
+            pan(e.wheelDeltaX, e.wheelDeltaY);
         });
         
         readFile(datafile,getData); //dataPoints now filled with data
+        
+//        resizeVisuals();
         
         root.find('.jumpForward').on('click',jumpForward);
         root.find('.jumpBack').on('click',jumpBack);
@@ -785,7 +781,12 @@ var Grapher = function() {
         });
         
         root.find('.pause').on('click',pause);
-        root.find('.start').on('click',start);
+        root.find('.start').on('click',function() {
+            if(paused) {
+                var next = getTransform(currentI);
+                animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, start);
+            }
+        });
         root.find('.stop').on('click',stop);
         
         $(window).on('resize',resizeVisuals);

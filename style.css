@@ -99,7 +99,9 @@ input[type='button']:focus{
 
 .time{
     margin-top:20px;
-    float:right;
+    float:left;
+    width:50px;
+    text-align:right;
 }
 
 .sidecontrols{
@@ -115,4 +117,19 @@ input[type='button']:focus{
     margin-top: 10px;
     margin-bottom: 10px;
     height: 30px;
+}
+
+#totalTime{
+    float:right;
+    width: 50px;
+}
+
+.jumpBack{
+    width:25px;
+    margin:1px;
+}
+
+.jumpForward{
+    width:25px;
+    margin:1px;
 }

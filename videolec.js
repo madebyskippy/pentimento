@@ -109,7 +109,7 @@ var Grapher = function() {
         boundingRect.height = boundingRect.ymax - boundingRect.ymin;
         console.log(boundingRect);
         minZoom = json.width/boundingRect.width;
-        $('#slider-vertical').slider({min: minZoom});
+        $('#zoomslider').slider({min: minZoom});
         resizeVisuals();
         return json;
     }
@@ -241,7 +241,7 @@ var Grapher = function() {
         totalZoom = newTransform.m11;
         translateX = newTransform.tx;
         translateY = newTransform.ty;
-        $('#slider-vertical').slider('value', totalZoom);
+        $('#zoomslider').slider('value', totalZoom);
         $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         clearFrame();
         oneFrame(currentI);
@@ -372,7 +372,7 @@ var Grapher = function() {
         totalZoom = newTransform.m11;
         translateX = newTransform.tx;
         translateY = newTransform.ty;
-        $('#slider-vertical').slider('value', totalZoom);
+        $('#zoomslider').slider('value', totalZoom);
         $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         clearFrame();
         oneFrame(val);
@@ -505,7 +505,7 @@ var Grapher = function() {
         var interpolatedTime = (Date.now() - startTime)/duration;
         
         if(interpolatedTime > 1 | (translateX === nx & translateY === ny & totalZoom === nz)) {
-            $('#slider-vertical').slider('value', nz);
+            $('#zoomslider').slider('value', nz);
             $('#zoomlabel').html(parseInt(nz*10)/10);
             callback();
         }
@@ -526,7 +526,7 @@ var Grapher = function() {
     
     function start(){
         if(paused){
-            $('#slider-vertical').slider({disabled:true});
+            $('#zoomslider').slider({disabled:true});
             wasDragging = false;
             
             paused=false;
@@ -538,7 +538,7 @@ var Grapher = function() {
     }
     
     function pause(){
-        $('#slider-vertical').slider({disabled:false});
+        $('#zoomslider').slider({disabled:false});
         
         paused=true;
         draw=clearInterval(draw);
@@ -561,7 +561,7 @@ var Grapher = function() {
 //        translateY = 0;
 //        totalZoom = 1;
 //        clearFrame();
-//        $('#slider-vertical').slider({disabled:true,value:1});
+//        $('#zoomslider').slider({disabled:true,value:1});
 //        $('#zoomlabel').html(1);
 //        $('#slider').slider('value', 0);
 //        root.find('.time').html('0');
@@ -591,7 +591,7 @@ var Grapher = function() {
         $('#slider').css('width',vidWidth/2-10);
         $('#slider').css('margin-top',buttonWidths/2);
         //I MADE CHANGES 7/25
-        $('.zoomslider').css('height',vidWidth/3);
+        $('.sidecontrols').css('height',2*vidWidth/3);
         
         $('.time').css('margin-top',buttonWidths/2);
         
@@ -622,7 +622,7 @@ var Grapher = function() {
         totalZoom = newTransform.m11;
         translateX = newTransform.tx;
         translateY = newTransform.ty;
-        $('#slider-vertical').slider('value', totalZoom);
+        $('#zoomslider').slider('value', totalZoom);
         $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         
         clearFrame();
@@ -648,7 +648,7 @@ var Grapher = function() {
         $('.timeControls').css('width','425px');
         $('#slider').css('width','300px');
         $('#slider').css('margin-top','20px');
-        $('.zoomslider').css('height', '190px');
+        $('.sidecontrols').css('height', '380px');
         $('.time').css('margin-top','20px');
         clearFrame();
         oneFrame(currentI);
@@ -683,10 +683,11 @@ var Grapher = function() {
     }
     
     var template="<a href='index.html'>index</a><br><div class='lecture'>"
-        + "<canvas class='video' style='cursor:crosshair;'></canvas>"
-        + "<div class='zoomslider' style='display:inline-block;position:absolute;margin-left:10px;'>"
-        + "+<div id='slider-vertical' style='height:75%;'></div>-"
+        + "<canvas class='video'></canvas>"
+        + "<div class='sidecontrols'>"
+        + "+<div id='zoomslider'></div>-"
         + "<div id='zoomlabel'>1</div>"
+        + "Drag to Pan<div id='toggleDrag'></div>Drag to Zoom"
         + "</div>"
         + "<br> <div class='controls'>"
         + "<div class='buttons'>"
@@ -715,7 +716,7 @@ var Grapher = function() {
         
         $('.buttons').append('<button class="jumpBack"> < 10s </button>');
         $('.buttons').append('<button class="jumpForward"> 10s > </button>');
-        $('.buttons').append('<button class="toggleDrag"> Drag to Pan </button>');
+//        $('.buttons').append('<button class="toggleDrag"> Drag to Pan </button>');
         
         $('#slider').slider({
             max:100,
@@ -738,7 +739,7 @@ var Grapher = function() {
         $('#slider').append('<div class="tick ui-widget-content"></div>');
         $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
-        $('#slider-vertical').slider({
+        $('#zoomslider').slider({
             disabled: true,
             orientation: 'vertical',
             range: 'min',
@@ -775,9 +776,16 @@ var Grapher = function() {
         
         root.find('.jumpForward').on('click',jumpForward);
         root.find('.jumpBack').on('click',jumpBack);
-        root.find('.toggleDrag').on('click', function() {
-            dragToPan = !dragToPan;
-            this.innerHTML = dragToPan?"Drag to Zoom":"Drag to Pan";
+//        root.find('.toggleDrag').on('click', function() {
+//            dragToPan = !dragToPan;
+//            this.innerHTML = dragToPan?"Drag to Zoom":"Drag to Pan";
+//        });
+        root.find('#toggleDrag').slider({
+            orientation: 'vertical',
+            min: 0, max: 1, step: 1, value: 0,
+            slide: function(e, ui) {
+                dragToPan = ui.value === 1;
+            }
         });
         
         root.find('.pause').on('click',pause);

@@ -1,5 +1,6 @@
 .video{
     border:1px solid #eee;
+    cursor: crosshair;
 }
 
 body{
@@ -99,4 +100,19 @@ input[type='button']:focus{
 .time{
     margin-top:20px;
     float:right;
+}
+
+.sidecontrols{
+    display:inline-block;
+    margin-left:10px;
+}
+
+#zoomslider{
+     height:50%;
+}
+
+#toggleDrag{
+    margin-top: 10px;
+    margin-bottom: 10px;
+    height: 30px;
 }

@@ -371,6 +371,7 @@ var Grapher = function() {
                 var data = currentStroke.vertices;
              
                 var path = [];
+                var graypath = [];
                 
                 //process the properties
                 var properties= currentStroke.properties;
@@ -419,14 +420,22 @@ var Grapher = function() {
                 //draw the stroke
                 if (!deleted || !currentStroke.doesItGetDeleted){
                     for (var j = 0; j < data.length; j++) { //for all verticies
+                        var x=data[j].x*xscale;
+                        var y=data[j].y*yscale;
+                        var pressure = data[j].pressure;
                         if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
-                            var x=data[j].x*xscale;
-                            var y=data[j].y*yscale;
-                            var pressure = data[j].pressure;
                             path.push([x,y,pressure*context.lineWidth*16]);
                         }
+                        else if(data[j].t < furthestpoint)
+                            graypath.push([x,y,pressure*context.lineWidth*16]);
                     }
-                    calligraphize(0, path);
+                    if(path.length > 0)
+                        calligraphize(0, path);
+                    if(graypath.length > 0) {
+                        context.fillStyle = "rgba(100,100,100,0.1)";
+                        context.strokeStyle = "rgba(50,50,50,0.1)";
+                        calligraphize(0, graypath);
+                    }
                 }
             }
         }

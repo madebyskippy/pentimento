@@ -413,7 +413,7 @@ var Grapher = function() {
                             
                             context.lineWidth = property.thickness*xscale/50;
                             
-                            if(property.time > current) {
+                            if(tmin > current) {
                                 context.fillStyle = "rgba(100,100,100,0.1)";
                                 context.strokeStyle = "rgba(50,50,50,0.1)";
                                 if(currentStroke.tDeletion < furthestpoint)
@@ -432,7 +432,7 @@ var Grapher = function() {
                         if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
                             path.push([x,y,pressure*context.lineWidth*16]);
                         }
-                        else if(data[j].t < furthestpoint)
+                        else if(tmin < current & data[j].t > current)
                             graypath.push([x,y,pressure*context.lineWidth*16]);
                     }
                     if(path.length > 0)

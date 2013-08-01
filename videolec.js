@@ -511,7 +511,10 @@ var Grapher = function() {
                     zoomRectW = c.width/c.height*zoomRectH;
                 clearFrame();
                 oneFrame(currentI);
-                context.fillStyle = 'rgba(0,0,255,0.1)';
+                if(c.width/Math.abs(zoomRectW/totalZoom) < maxZoom)
+                    context.fillStyle = 'rgba(0,255,0,0.1)';
+                else
+                    context.fillStyle = 'rgba(0,0,255,0.1)';
                 context.fillRect((previousX-offset.left-translateX)/totalZoom,
                                  (previousY-offset.top-translateY)/totalZoom,
                                  zoomRectW/totalZoom, zoomRectH/totalZoom);
@@ -810,6 +813,34 @@ var Grapher = function() {
 		context.strokeStyle='black';
 		context.lineCap='round';
         
+//        var divdbl = $(window);
+//        var doubled = false;
+//        function listen(e) {
+//            divdbl.off('mouseup');
+//            doubled = false;
+//            var click = setTimeout(function() {
+//                divdbl.off('mouseup');
+//                if(!doubled) {
+//                    //do single click things
+//                    console.log('click');
+//                    isDragging = true;
+//                    dragStop();
+//                }
+//                doubled = false;
+//                divdbl.on('mouseup', listen);
+//            },200);
+//            divdbl.on('mouseup', function() {
+//                clearTimeout(click);
+//                //double click things
+//                isDragging = false;
+//                console.log('doubleclick');
+//                doubled = true;
+//                divdbl.off('mouseup');
+//                divdbl.on('mouseup', listen);
+//            });
+//        }
+//        divdbl.on('mouseup', listen);
+        
         window.addEventListener('mousedown', function(e) {
             if(e.target === c)
                 dragStart(e);
@@ -818,6 +849,7 @@ var Grapher = function() {
         window.addEventListener('mouseup', dragStop);
         
         c.addEventListener('mousewheel', function(e){
+            e.preventDefault();
             if(!wasDragging)
                 pause();
             if(dragToPan) {
@@ -847,6 +879,7 @@ var Grapher = function() {
             }
         });
         
+        //SHIFT TO TOGGLE SCROLL TO ZOOM
         window.addEventListener('keydown', function(e) {
             var key = e.keyCode || e.which;
             if(key === 16) { //shift

@@ -82,6 +82,20 @@ var Grapher = function() {
     */
     
     function preProcess(json) {
+        //get bounding box
+        boundingRect.xmax = json.width;
+        boundingRect.ymax = json.height;
+        for(i in json.visuals) {
+            var stroke = json.visuals[i].vertices;
+            for(j in stroke) {
+                var point = stroke[j];
+                point.y = json.height-point.y;
+                if(point.x < boundingRect.xmin) boundingRect.xmin = point.x;
+                if(point.x > boundingRect.xmax) boundingRect.xmax = point.x;
+                if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
+                if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
+            }
+        }
 //        //divide into similar-direction polygons
 //        for(var i=0; i<json.visuals.length; i++) {
 //            var visual = json.visuals[i],
@@ -96,10 +110,9 @@ var Grapher = function() {
 //                    bc = getDistance(next.x, next.y, next.x+1, next.y+1),
 //                    ac = getDistance(point.x, point.y, next.x+1, next.y+1);
 //                var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
-//                if(newcosb !== 0) {
+//                if(newcosb !== 0 & !isNaN(newcosb)) {
 //                    if(cosb !== undefined & newcosb/cosb < 0) {
 //                        newStrokes.push(j);
-//                        console.log(point.t);
 //                    }
 //                    cosb = newcosb;
 //                }
@@ -121,20 +134,6 @@ var Grapher = function() {
 //                stroke = stroke.slice(0,newStrokes[0]+1);
 //            }
 //        }
-        //get bounding box
-        boundingRect.xmax = json.width;
-        boundingRect.ymax = json.height;
-        for(i in json.visuals) {
-            var stroke = json.visuals[i].vertices;
-            for(j in stroke) {
-                var point = stroke[j];
-                point.y = json.height-point.y;
-                if(point.x < boundingRect.xmin) boundingRect.xmin = point.x;
-                if(point.x > boundingRect.xmax) boundingRect.xmax = point.x;
-                if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
-                if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
-            }
-        }
         //invert y transforms
         for(i in json.cameraTransforms) {
             var transform = json.cameraTransforms[i];
@@ -368,7 +367,7 @@ var Grapher = function() {
             var tmin = currentStroke.tMin;
             var deleted=false;
             
-            if(tmin < current){
+            if(tmin < furthestpoint){
                 var data = currentStroke.vertices;
              
                 var path = [];
@@ -377,7 +376,7 @@ var Grapher = function() {
                 var properties= currentStroke.properties;
                 for(var k=0; k< properties.length; k++){ //for all properties of the stroke
                     var property=properties[k];
-                    if (property.time < current) { //if property is to be shown
+                    if (property.time < furthestpoint) { //if property is to be shown
                         var fadeIndex = 1;
                         if(property.type === "fadingProperty") { //calculate fade rate
                             var timeBeginFade = currentStroke.tDeletion+
@@ -406,6 +405,13 @@ var Grapher = function() {
                                               ","+b+","+(property.alpha*fadeIndex)+")";
                             
                             context.lineWidth = property.thickness*xscale/50;
+                            
+                            if(property.time > current) {
+                                context.fillStyle = "rgba(100,100,100,0.1)";
+                                context.strokeStyle = "rgba(50,50,50,0.1)";
+                                if(currentStroke.tDeletion < furthestpoint)
+                                    deleted = true;
+                            }
                         }
                     }
                 }
@@ -413,7 +419,7 @@ var Grapher = function() {
                 //draw the stroke
                 if (!deleted || !currentStroke.doesItGetDeleted){
                     for (var j = 0; j < data.length; j++) { //for all verticies
-                        if (data[j].t < current){
+                        if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
                             var x=data[j].x*xscale;
                             var y=data[j].y*yscale;
                             var pressure = data[j].pressure;
@@ -840,7 +846,7 @@ var Grapher = function() {
             },tolerance);
             element.on('mouseup', function() {
                 clearTimeout(click);
-                double();
+                double(e);
                 doubled = true;
                 element.off('mouseup');
                 onClick();
@@ -932,19 +938,21 @@ var Grapher = function() {
             },
             move: dragging,
             up: dragStop,
-            double: function() {
-                isDragging = false;
-                var zoom = totalZoom===1?2:1;
-                function animateZoom() {
-                    zoomStart();
-                    zooming('trash', {value: totalZoom<zoom?
-                                      parseInt(totalZoom*10+1)/10:
-                                      parseInt(totalZoom*10-1)/10});
-                    $('#zoomslider').slider('value', totalZoom);
-                    if(totalZoom !== zoom)
-                        setTimeout(animateZoom, 10);
+            double: function(e) {
+                if(e.target === c) {
+                    isDragging = false;
+                    var zoom = totalZoom===1?2:1;
+                    function animateZoom() {
+                        zoomStart();
+                        zooming('trash', {value: totalZoom<zoom?
+                                          parseInt(totalZoom*10+1)/10:
+                                          parseInt(totalZoom*10-1)/10});
+                        $('#zoomslider').slider('value', totalZoom);
+                        if(totalZoom !== zoom)
+                            setTimeout(animateZoom, 10);
+                    }
+                    animateZoom();
                 }
-                animateZoom();
             },
             touch: false,
             tolerance: 200

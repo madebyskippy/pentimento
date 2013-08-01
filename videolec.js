@@ -126,13 +126,13 @@ var Grapher = function() {
         imax = dataArray.durationInSeconds;
         xmax=dataArray.width;
         ymax=dataArray.height;
-        console.log("imax: "+imax);
         $('#slider').slider("option","max",imax);
         slider.max=imax;
         $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         numStrokes=dataArray.visuals.length;
         
-        if (localStorage.currentTime != undefined){
+        if (localStorage.currentTime != undefined && 
+                !isNaN(localStorage.currentTime)){
             var newTransform = getTransform(currentI);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -194,18 +194,20 @@ var Grapher = function() {
             currentI = time;
             
             var newTransform = getTransform(currentI);
-            totalZoom = newTransform.m11;
-            translateX = newTransform.tx;
-            translateY = newTransform.ty;
-            $('#zoomslider').slider('value', totalZoom);
-            $('#zoomlabel').html(parseInt(totalZoom*10)/10);
-            clearFrame();
-            oneFrame(time);
-            changeSlider(time);
-            if (isAudio) audio.currentTime=time;
+            animateToPos(Date.now(), 200, newTransform.tx, newTransform.ty, newTransform.m11, function(){
+                totalZoom = newTransform.m11;
+                translateX = newTransform.tx;
+                translateY = newTransform.ty;
+                $('#zoomslider').slider('value', totalZoom);
+                $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+                clearFrame();
+                oneFrame(time);
+                changeSlider(time);
+                if (isAudio) audio.currentTime=time;
+            });
+            //animate to pos with new transform, put draw-one-frame-stuff in callback function
         }
         if(!paused){ // if it wasn't paused, keep playing
-            console.log("stroke selected, gonna keep playing");
             paused=true; //it only starts if it was previously paused.
             var next = getTransform(currentI);
             animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, start);
@@ -402,7 +404,7 @@ var Grapher = function() {
     }
     
     function changeSlider(current){
-        if (current<imax){ 
+        if (current<=imax){ 
             $('#slider').slider('value',current);
             var secondsPassed=parseFloat(current);
             root.find('.time').html(secondsToTimestamp(secondsPassed));
@@ -635,6 +637,12 @@ var Grapher = function() {
         localStorage.currentTime=undefined;
         localStorage.furthestPoint=undefined;
         
+        
+        root.find('.start').css('background-image',
+            "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+        $('#slider .ui-slider-handle').css('background','#f55');
+        root.find('.video').css('border','1px solid #f88');
+        
         furthestpoint=0;
         
         oneFrame(imax);
@@ -813,34 +821,6 @@ var Grapher = function() {
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-//        var divdbl = $(window);
-//        var doubled = false;
-//        function listen(e) {
-//            divdbl.off('mouseup');
-//            doubled = false;
-//            var click = setTimeout(function() {
-//                divdbl.off('mouseup');
-//                if(!doubled) {
-//                    //do single click things
-//                    console.log('click');
-//                    isDragging = true;
-//                    dragStop();
-//                }
-//                doubled = false;
-//                divdbl.on('mouseup', listen);
-//            },200);
-//            divdbl.on('mouseup', function() {
-//                clearTimeout(click);
-//                //double click things
-//                isDragging = false;
-//                console.log('doubleclick');
-//                doubled = true;
-//                divdbl.off('mouseup');
-//                divdbl.on('mouseup', listen);
-//            });
-//        }
-//        divdbl.on('mouseup', listen);
-        
         window.addEventListener('mousedown', function(e) {
             if(e.target === c)
                 dragStart(e);
@@ -940,11 +920,11 @@ var Grapher = function() {
         
         
         console.log(localStorage);
-        if (localStorage.currentTime != undefined){ //if there is a time saved
+        if (localStorage.currentTime != undefined && !isNaN(localStorage.currentTime)){ //if there is a time saved
             currentI=parseFloat(localStorage.currentTime);
             offsetTime=currentI*1000;
             
-            if(localStorage.furthestPoint != undefined) {
+            if(localStorage.furthestPoint != undefined && !isNaN(localStorage.furthestPoint)) {
                 furthestpoint = parseFloat(localStorage.furthestPoint); 
             }
         }

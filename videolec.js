@@ -34,7 +34,7 @@ var Grapher = function() {
     
     var initialTime; //initial time of start of video
     var currentI=0; //current index of time (in seconds)
-    var currentTime; //current time, as given by date.now();
+    var currentTime=0; //current time, as given by date.now();
     var offsetTime=0; //for use with pause
     var paused=true;
     var setTime=false; //true if time was set by slider or strokeFinding
@@ -151,6 +151,9 @@ var Grapher = function() {
         $('#zoomslider').slider({min: minZoom});
         resizeVisuals();
         numStrokes=json.visuals.length;
+        
+        
+        
         return json;
     }
     
@@ -165,8 +168,8 @@ var Grapher = function() {
         slider.max=imax;
         $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         dataArray = preProcess(dataArray);
-        if (localStorage.currentTime != undefined && 
-                !isNaN(localStorage.currentTime)){
+        
+        if (localStorage[datafile]!= undefined){
             var newTransform = getTransform(currentI);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -178,6 +181,7 @@ var Grapher = function() {
             oneFrame(currentI);
             if (isAudio) audio.currentTime=currentI;
         }
+
     }
 
 	function readFile(url, callback) {
@@ -318,12 +322,14 @@ var Grapher = function() {
 		currentTime=Date.now(); //gets current time
 		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
 		changeSlider(currentI);
-        localStorage.currentTime=parseFloat(currentI);
-        
         if (currentI > furthestpoint){
             furthestpoint=currentI;
-            localStorage.furthestPoint = parseFloat(furthestpoint);
         }
+        
+        var local = { 'currentTime': parseFloat(currentI), 
+                     'furthestPoint': parseFloat(furthestpoint)};
+        
+        localStorage[datafile]=JSON.stringify(local);
         
         var newTransform = getTransform(currentI);
         totalZoom = newTransform.m11;
@@ -463,7 +469,8 @@ var Grapher = function() {
             
             //update tick
             var percentage = (furthestpoint)/imax * 100;
-            $('.tick').css('left', percentage + '%');
+            $('.tick').css('width',percentage+'%');
+            $('.tick').css('left', '0%');//percentage + '%');
             
         }
     }
@@ -661,11 +668,13 @@ var Grapher = function() {
                 "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
             $('#slider .ui-slider-handle').css('background','#0b0');
             root.find('.video').css('border','1px solid #eee');
+            $('.onScreenStatus').css('visibility',"hidden");
             
             paused=false;
             setTime=false;
             initialTime=Date.now()-offsetTime;
             draw=setInterval(graphData,50);
+            if (isAudio) audio.currentTime=currentI;
             audio.play();
         }
     }
@@ -676,6 +685,8 @@ var Grapher = function() {
             "url('http://web.mit.edu/lilis/www/videolec/play.png')");
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
+        $('.onScreenStatus').css('visibility',"visible");
+        fadePauseSign();
         
         paused=true;
         draw=clearInterval(draw);
@@ -693,8 +704,10 @@ var Grapher = function() {
         paused=true;
         draw=clearInterval(draw);
         
-        localStorage.currentTime=undefined;
-        localStorage.furthestPoint=undefined;
+        var local = { 'currentTime': undefined, 
+                     'furthestPoint': undefined};
+        
+        localStorage[datafile]=JSON.stringify(local);
         
         
         root.find('.start').css('background-image',
@@ -709,6 +722,15 @@ var Grapher = function() {
         audio.pause();
         if (isAudio) audio.currentTime=0;
         offsetTime=0;
+    }
+    
+    function fadePauseSign(){
+        $('.onScreenStatus').animate({
+            opacity: 0
+        },1000,function(){
+            $('.onScreenStatus').css('visibility',"hidden");
+            $('.onScreenStatus').css('opacity',".5");
+        });
     }
     
     function jumpForward(){
@@ -804,6 +826,18 @@ var Grapher = function() {
         $('.controls').css({position: 'absolute',
                             top: (($('.video').offset().top+$('.video').height()+10)+'px'),
                             left: ($('.video').offset().left+'px')})
+        
+        var onScreenStatusWidth=c.width * 80/575;
+        $('.onScreenStatus').css('margin-top', -c.height/2-onScreenStatusWidth/2);
+        $('.onScreenStatus').css('margin-left',c.width/2-onScreenStatusWidth/2);
+        $('#pauseIcon').css('width',onScreenStatusWidth+"px");
+        $('#pauseIcon').css('height',onScreenStatusWidth+"px");
+        $('.onScreenStatus').css('opacity',".5");
+        if (paused && currentTime != 0){ //paused but has been started at some point
+            $('.onScreenStatus').css('visibility',"visible");
+        }else {
+            $('.onScreenStatus').css('visibility',"hidden");
+        }
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -867,6 +901,7 @@ var Grapher = function() {
     
     var template="<a href='index.html'>back to menu</a><br><div class='lecture'>"
         + "<canvas class='video'></canvas>"
+        + "<div class='onScreenStatus'> <img src='http://web.mit.edu/lilis/www/videolec/pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<div class='sidecontrols'>"
         + "+<div id='zoomslider'></div>-"
         + "<div id='zoomlabel'>1</div>"
@@ -877,11 +912,10 @@ var Grapher = function() {
         + "<input class='start' type='button'/>"
         + "</div>"
         + "<div class='timeControls'>"
-//        + "<div class='time'>0:0</div>"
         + "<div id='slider'></div>"
         + "<div id='totalTime'></div>"
         + "</div>"
-        + "<audio class='audio' preload='auto'>"
+        + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "</audio>"
         + "</div>"
@@ -1050,13 +1084,12 @@ var Grapher = function() {
         
         
         console.log(localStorage);
-        if (localStorage.currentTime != undefined && !isNaN(localStorage.currentTime)){ //if there is a time saved
-            currentI=parseFloat(localStorage.currentTime);
+        
+        if (localStorage[datafile]!=undefined){
+            var local=JSON.parse(localStorage[datafile]);
+            currentI=local.currentTime;
+            furthestpoint=local.furthestPoint;
             offsetTime=currentI*1000;
-            
-            if(localStorage.furthestPoint != undefined && !isNaN(localStorage.furthestPoint)) {
-                furthestpoint = parseFloat(localStorage.furthestPoint); 
-            }
         }
         
         $(window).on('resize',resizeVisuals);

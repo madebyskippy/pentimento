@@ -82,6 +82,45 @@ var Grapher = function() {
     */
     
     function preProcess(json) {
+//        //divide into similar-direction polygons
+//        for(var i=0; i<json.visuals.length; i++) {
+//            var visual = json.visuals[i],
+//                stroke = visual.vertices,
+//                newStrokes = [];
+//            //find all breaking points
+//            var cosb;
+//            for(var j=0; j<stroke.length-1; j++) {
+//                var point = stroke[j],
+//                    next = stroke[j+1];
+//                var ab = getDistance(point.x, point.y, next.x, next.y),
+//                    bc = getDistance(next.x, next.y, next.x+1, next.y+1),
+//                    ac = getDistance(point.x, point.y, next.x+1, next.y+1);
+//                var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
+//                if(newcosb !== 0) {
+//                    if(cosb !== undefined & newcosb/cosb < 0) {
+//                        newStrokes.push(j);
+//                        console.log(point.t);
+//                    }
+//                    cosb = newcosb;
+//                }
+//            }
+//            if(newStrokes.length !== 0) {
+//                newStrokes.push(stroke.length-1);
+//                //at each breaking point, create new stroke
+//                for(var k=0; k<newStrokes.length-1; k++) {
+//                    var begin = newStrokes[k];
+//                    var end = newStrokes[k+1];
+//                    var newVertices = [];
+//                    var newVisual;
+//                    for(var h=begin; h<=end; h++)
+//                        newVertices.push(jQuery.extend(true,{},stroke[h]));
+//                    newVisual = jQuery.extend(true,{},visual);
+//                    newVisual.vertices = newVertices;
+//                    json.visuals.push(newVisual);
+//                }
+//                stroke = stroke.slice(0,newStrokes[0]+1);
+//            }
+//        }
         //get bounding box
         boundingRect.xmax = json.width;
         boundingRect.ymax = json.height;
@@ -194,20 +233,16 @@ var Grapher = function() {
             setTime=true;
             currentI = time;
             
-            if (paused){
+            if(paused) {
                 var newTransform = getTransform(currentI);
                 animateToPos(Date.now(), 200, newTransform.tx, newTransform.ty, newTransform.m11, function(){
-                    totalZoom = newTransform.m11;
-                    translateX = newTransform.tx;
-                    translateY = newTransform.ty;
                     $('#zoomslider').slider('value', totalZoom);
                     $('#zoomlabel').html(parseInt(totalZoom*10)/10);
-                    clearFrame();
-                    oneFrame(time);
                     changeSlider(time);
                     if (isAudio) audio.currentTime=time;
                 });
             }
+            //animate to pos with new transform, put draw-one-frame-stuff in callback function
         }
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
@@ -543,11 +578,7 @@ var Grapher = function() {
                     var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
                     nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
                     ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
-                    animateToPos(Date.now(), 200, nx, ny, nz, function() {
-                        translateX = nx;
-                        translateY = ny;
-                        totalZoom = nz;
-                    });
+                    animateToPos(Date.now(), 200, nx, ny, nz);
                 }
                 else {
                     clearFrame();
@@ -566,6 +597,20 @@ var Grapher = function() {
         }
     }
     
+//    function getZoomTransform(centerX, centerY, newZoom) {
+//        centerX = previousX-offset.left+zoomRectW/2;
+//        newZoom = c.width/zoomRectW/totalZoom;
+//        var nx = -(previousX - offset.left - translateX)/totalZoom*newZoom;
+//        var ny = -(previousY - offset.top - translateY)/totalZoom*newZoom;
+//        
+//        //zoom in on center of visible portion achieved by extra translations
+//        nx = translateX + (1-newZoom/totalZoom)*(c.width/2-translateX);
+//        nx = translateY + (1-newZoom/totalZoom)*(c.height/2-translateY);
+//        
+//        nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*newZoom),-boundingRect.xmin);
+//        ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*newZoom),-boundingRect.ymin);
+//    }
+    
     //animates back to playing position before playing
     function animateToPos(startTime, duration, nx, ny, nz, callback) {
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
@@ -574,6 +619,7 @@ var Grapher = function() {
         var interpolatedTime = (Date.now() - startTime)/duration;
         
         if(interpolatedTime > 1 | (translateX === nx & translateY === ny & totalZoom === nz)) {
+            translateX = nx, translateY = ny, totalZoom = nz;
             $('#zoomslider').slider('value', nz);
             $('#zoomlabel').html(parseInt(nz*10)/10);
             callback();
@@ -922,10 +968,17 @@ var Grapher = function() {
             up: dragStop,
             double: function() {
                 isDragging = false;
-                zoomStart();
                 var zoom = totalZoom===1?2:1;
-                zooming('trash', {value: zoom});
-                $('#zoomslider').slider('value', totalZoom);
+                function animateZoom() {
+                    zoomStart();
+                    zooming('trash', {value: totalZoom<zoom?
+                                      parseInt(totalZoom*10+1)/10:
+                                      parseInt(totalZoom*10-1)/10});
+                    $('#zoomslider').slider('value', totalZoom);
+                    if(totalZoom !== zoom)
+                        setTimeout(animateZoom, 10);
+                }
+                animateZoom();
             },
             touch: false,
             tolerance: 200
@@ -988,23 +1041,11 @@ var Grapher = function() {
         $('#revertPos').on('click', function () {
             if(!paused) pause();
             var next = getTransform(currentI);
-            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function() {
-                translateX=next.tx;
-                translateY=next.ty;
-                totalZoom=next.m11;
-                clearFrame();
-                oneFrame(currentI);
-            });
+            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11);
         });
         $('#seeAll').on('click', function() {
             if(!paused) pause();
-            animateToPos(Date.now(), 200, 0, 0, minZoom, function() {
-                translateX=0;
-                translateY=0;
-                totalZoom=minZoom;
-                clearFrame();
-                oneFrame(currentI);
-            });
+            animateToPos(Date.now(), 200, 0, 0, minZoom);
         });
                 
         root.find('.start').on('click',function() {

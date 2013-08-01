@@ -38,6 +38,8 @@ var Grapher = function() {
     var offsetTime=0; //for use with pause
     var paused=true;
     var setTime=false; //true if time was set by slider or strokeFinding
+    var initialPause; //used in dragging 
+        //(dragging pauses but unpauses if it was just a click)
     var draw;
     
     var numStrokes=0;
@@ -160,11 +162,23 @@ var Grapher = function() {
         imax = dataArray.durationInSeconds;
         xmax=dataArray.width;
         ymax=dataArray.height;
-        console.log("imax: "+imax);
         $('#slider').slider("option","max",imax);
         slider.max=imax;
         $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         dataArray = preProcess(dataArray);
+        if (localStorage.currentTime != undefined && 
+                !isNaN(localStorage.currentTime)){
+            var newTransform = getTransform(currentI);
+            totalZoom = newTransform.m11;
+            translateX = newTransform.tx;
+            translateY = newTransform.ty;
+            $('#zoomslider').slider('value', totalZoom);
+            $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+            clearFrame();
+            changeSlider(currentI);
+            oneFrame(currentI);
+            if (isAudio) audio.currentTime=currentI;
+        }
     }
 
 	function readFile(url, callback) {
@@ -214,10 +228,20 @@ var Grapher = function() {
             offsetTime=time*1000;
             setTime=true;
             currentI = time;
-//            clearFrame();
-//            oneFrame(time);
-            changeSlider(time);
-            if (isAudio) audio.currentTime=time;
+            
+            var newTransform = getTransform(currentI);
+            animateToPos(Date.now(), 200, newTransform.tx, newTransform.ty, newTransform.m11, function(){
+                totalZoom = newTransform.m11;
+                translateX = newTransform.tx;
+                translateY = newTransform.ty;
+                $('#zoomslider').slider('value', totalZoom);
+                $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+                clearFrame();
+                oneFrame(time);
+                changeSlider(time);
+                if (isAudio) audio.currentTime=time;
+            });
+            //animate to pos with new transform, put draw-one-frame-stuff in callback function
         }
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
@@ -298,6 +322,12 @@ var Grapher = function() {
 		currentTime=Date.now(); //gets current time
 		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
 		changeSlider(currentI);
+        localStorage.currentTime=parseFloat(currentI);
+        
+        if (currentI > furthestpoint){
+            furthestpoint=currentI;
+            localStorage.furthestPoint = parseFloat(furthestpoint);
+        }
         
         var newTransform = getTransform(currentI);
         totalZoom = newTransform.m11;
@@ -307,6 +337,7 @@ var Grapher = function() {
         $('#zoomlabel').html(parseInt(totalZoom*10)/10);
         clearFrame();
         oneFrame(currentI);
+        
         if (currentI>imax) {
             stop();
         }
@@ -409,7 +440,7 @@ var Grapher = function() {
     }
     
     function changeSlider(current){
-        if (current<imax){ 
+        if (current<=imax){ 
             $('#slider').slider('value',current);
             var secondsPassed=parseFloat(current);
             root.find('.time').html(secondsToTimestamp(secondsPassed));
@@ -418,12 +449,10 @@ var Grapher = function() {
             root.find('#totalTime').html(secondsToTimestamp(secondsPassed)+" / ");
             root.find('#totalTime').append(secondsToTimestamp(imax));
             
-            //update ticks
-            if (current > furthestpoint){
-                furthestpoint=current;
-                var percentage = (furthestpoint)/imax * 100;
-                $('.tick').css('left', percentage + '%');
-            }
+            //update tick
+            var percentage = (furthestpoint)/imax * 100;
+            $('.tick').css('left', percentage + '%');
+            
         }
     }
     
@@ -495,6 +524,7 @@ var Grapher = function() {
         previousX = e.pageX;
         previousY = e.pageY;
         if(!wasDragging)
+            initialPause=paused;
             pause(); // only pauses the first time
         wasDragging = false;
     }
@@ -559,7 +589,7 @@ var Grapher = function() {
             }
             
             if(!wasDragging) { // click
-                paused = false;
+                paused = initialPause;
                 previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
                 previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
                 selectStroke(previousX,previousY);
@@ -607,6 +637,7 @@ var Grapher = function() {
             root.find('.start').css('background-image',
                 "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
             $('#slider .ui-slider-handle').css('background','#0b0');
+            root.find('.video').css('border','1px solid #eee');
             
             paused=false;
             setTime=false;
@@ -621,6 +652,7 @@ var Grapher = function() {
         root.find('.start').css('background-image',
             "url('http://web.mit.edu/lilis/www/videolec/play.png')");
         $('#slider .ui-slider-handle').css('background','#f55');
+        root.find('.video').css('border','1px solid #f88');
         
         paused=true;
         draw=clearInterval(draw);
@@ -637,6 +669,15 @@ var Grapher = function() {
     function stop(){
         paused=true;
         draw=clearInterval(draw);
+        
+        localStorage.currentTime=undefined;
+        localStorage.furthestPoint=undefined;
+        
+        
+        root.find('.start').css('background-image',
+            "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+        $('#slider .ui-slider-handle').css('background','#f55');
+        root.find('.video').css('border','1px solid #f88');
         
         furthestpoint=0;
         
@@ -734,10 +775,6 @@ var Grapher = function() {
         xscale=(c.width)/xmax;
         offset = root.find('.video').offset();
         resizeControls(c.width);
-//        if (c.width<575) {
-//            resizeControls(c.width);
-//        }
-//        else { resetControlSize(); }
         $('.sidecontrols').css({position: 'absolute',
                                 top: ($('.video').offset().top+'px'),
                                 left: (($('.video').offset().left+$('.video').width()+10)+'px')});
@@ -951,6 +988,7 @@ var Grapher = function() {
         $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
         $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
         $('.sidecontrols').css('position', 'absolute');
+        
         $('#revertPos').on('click', function () {
             if(!paused) pause();
             var next = getTransform(currentI);
@@ -989,6 +1027,17 @@ var Grapher = function() {
                 root.find('.start').click();
             }
         });
+        
+        
+        console.log(localStorage);
+        if (localStorage.currentTime != undefined && !isNaN(localStorage.currentTime)){ //if there is a time saved
+            currentI=parseFloat(localStorage.currentTime);
+            offsetTime=currentI*1000;
+            
+            if(localStorage.furthestPoint != undefined && !isNaN(localStorage.furthestPoint)) {
+                furthestpoint = parseFloat(localStorage.furthestPoint); 
+            }
+        }
         
         $(window).on('resize',resizeVisuals);
     }

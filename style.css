@@ -1,6 +1,6 @@
 .video{
     border:1px solid #eee;
-    cursor: crosshair;
+    cursor: default;
 }
 
 body{

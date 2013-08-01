@@ -80,6 +80,45 @@ var Grapher = function() {
     */
     
     function preProcess(json) {
+//        //divide into similar-direction polygons
+//        for(var i=0; i<json.visuals.length; i++) {
+//            var visual = json.visuals[i],
+//                stroke = visual.vertices,
+//                newStrokes = [];
+//            //find all breaking points
+//            var cosb;
+//            for(var j=0; j<stroke.length-1; j++) {
+//                var point = stroke[j],
+//                    next = stroke[j+1];
+//                var ab = getDistance(point.x, point.y, next.x, next.y),
+//                    bc = getDistance(next.x, next.y, next.x+1, next.y+1),
+//                    ac = getDistance(point.x, point.y, next.x+1, next.y+1);
+//                var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
+//                if(newcosb !== 0) {
+//                    if(cosb !== undefined & newcosb/cosb < 0) {
+//                        newStrokes.push(j);
+//                        console.log(point.t);
+//                    }
+//                    cosb = newcosb;
+//                }
+//            }
+//            if(newStrokes.length !== 0) {
+//                newStrokes.push(stroke.length-1);
+//                //at each breaking point, create new stroke
+//                for(var k=0; k<newStrokes.length-1; k++) {
+//                    var begin = newStrokes[k];
+//                    var end = newStrokes[k+1];
+//                    var newVertices = [];
+//                    var newVisual;
+//                    for(var h=begin; h<=end; h++)
+//                        newVertices.push(jQuery.extend(true,{},stroke[h]));
+//                    newVisual = jQuery.extend(true,{},visual);
+//                    newVisual.vertices = newVertices;
+//                    json.visuals.push(newVisual);
+//                }
+//                stroke = stroke.slice(0,newStrokes[0]+1);
+//            }
+//        }
         //get bounding box
         boundingRect.xmax = json.width;
         boundingRect.ymax = json.height;

@@ -432,7 +432,7 @@ var Grapher = function() {
                         if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
                             path.push([x,y,pressure*context.lineWidth*16]);
                         }
-                        else if(tmin < current & data[j].t > current)
+                        else if(data[j].t < furthestpoint & data[j].t > current)
                             graypath.push([x,y,pressure*context.lineWidth*16]);
                     }
                     if(path.length > 0)
@@ -611,20 +611,6 @@ var Grapher = function() {
         }
     }
     
-//    function getZoomTransform(centerX, centerY, newZoom) {
-//        centerX = previousX-offset.left+zoomRectW/2;
-//        newZoom = c.width/zoomRectW/totalZoom;
-//        var nx = -(previousX - offset.left - translateX)/totalZoom*newZoom;
-//        var ny = -(previousY - offset.top - translateY)/totalZoom*newZoom;
-//        
-//        //zoom in on center of visible portion achieved by extra translations
-//        nx = translateX + (1-newZoom/totalZoom)*(c.width/2-translateX);
-//        nx = translateY + (1-newZoom/totalZoom)*(c.height/2-translateY);
-//        
-//        nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*newZoom),-boundingRect.xmin);
-//        ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*newZoom),-boundingRect.ymin);
-//    }
-    
     //animates back to playing position before playing
     function animateToPos(startTime, duration, nx, ny, nz, callback) {
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
@@ -634,6 +620,8 @@ var Grapher = function() {
         
         if(interpolatedTime > 1 | (translateX === nx & translateY === ny & totalZoom === nz)) {
             translateX = nx, translateY = ny, totalZoom = nz;
+            clearFrame();
+            oneFrame(currentI);
             $('#zoomslider').slider('value', nz);
             $('#zoomlabel').html(parseInt(nz*10)/10);
             callback();

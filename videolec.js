@@ -462,7 +462,6 @@ var Grapher = function() {
             $('#slider').slider('value',current);
             var secondsPassed=parseFloat(current);
             root.find('.time').html(secondsToTimestamp(secondsPassed));
-            //root.find('.time').append(secondsToTimestamp(imax));
             
             root.find('#totalTime').html(secondsToTimestamp(secondsPassed)+" / ");
             root.find('#totalTime').append(secondsToTimestamp(imax));

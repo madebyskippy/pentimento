@@ -432,7 +432,7 @@ var Grapher = function() {
                         if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
                             path.push([x,y,pressure*context.lineWidth*16]);
                         }
-                        else if(currentStroke.tEndEdit < current & data[j].t > current)
+                        else if(data[j].t < furthestpoint & data[j].t > current)
                             graypath.push([x,y,pressure*context.lineWidth*16]);
                     }
                     if(path.length > 0)
@@ -621,6 +621,8 @@ var Grapher = function() {
         
         if(interpolatedTime > 1 | (translateX === nx & translateY === ny & totalZoom === nz)) {
             translateX = nx, translateY = ny, totalZoom = nz;
+            clearFrame();
+            oneFrame(currentI);
             $('#zoomslider').slider('value', nz);
             $('#zoomlabel').html(parseInt(nz*10)/10);
             callback();

@@ -246,9 +246,9 @@ var Grapher = function() {
             for(var j=0;j<currentStroke.vertices.length; j++){
                 var deletedYet=false;
                 if (currentStroke.doesItGetDeleted){
-                    if (currentStroke.tDeletion<currentI) deletedYet=true;
+                    if (currentStroke.tDeletion<furthestpoint) deletedYet=true;
                 }
-                if (currentStroke.vertices[j].t<currentI & !deletedYet){
+                if (currentStroke.vertices[j].t<furthestpoint & !deletedYet){
                     //check closeness of x,y to this current point
                     var dist = getDistance(x,y,currentStroke.vertices[j].x,
                                            currentStroke.vertices[j].y)

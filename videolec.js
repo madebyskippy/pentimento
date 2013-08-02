@@ -213,7 +213,7 @@ var Grapher = function() {
             translateX = newTransform.tx;
             translateY = newTransform.ty;
             $('#zoomslider').slider('value', totalZoom);
-            $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+            displayZoom(totalZoom);
             clearFrame();
             changeSlider(currentI);
             oneFrame(currentI);
@@ -274,7 +274,7 @@ var Grapher = function() {
                 var newTransform = getTransform(currentI);
                 animateToPos(Date.now(), 200, newTransform.tx, newTransform.ty, newTransform.m11, function(){
                     $('#zoomslider').slider('value', totalZoom);
-                    $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+                    displayZoom(totalZoom);
                     changeSlider(time);
                     if (isAudio) audio.currentTime=time;
                 });
@@ -374,7 +374,7 @@ var Grapher = function() {
         translateX = newTransform.tx;
         translateY = newTransform.ty;
         $('#zoomslider').slider('value', totalZoom);
-        $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+        displayZoom(totalZoom);
         clearFrame();
         oneFrame(currentI);
         
@@ -500,7 +500,6 @@ var Grapher = function() {
             $('#slider').slider('value',current);
             var secondsPassed=parseFloat(current);
             root.find('.time').html(secondsToTimestamp(secondsPassed));
-            //root.find('.time').append(secondsToTimestamp(imax));
             
             root.find('#totalTime').html(secondsToTimestamp(secondsPassed)+" / ");
             root.find('#totalTime').append(secondsToTimestamp(imax));
@@ -526,7 +525,7 @@ var Grapher = function() {
         translateX = newTransform.tx;
         translateY = newTransform.ty;
         $('#zoomslider').slider('value', totalZoom);
-        $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+        displayZoom(totalZoom);
         clearFrame();
         oneFrame(val);
         changeSlider(val);
@@ -560,12 +559,26 @@ var Grapher = function() {
     //triggered when zoom slider is changed
     function zooming(event, ui) {
         totalZoom = Math.max(minZoom, Math.min(ui.value, maxZoom));
-        $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+        displayZoom(totalZoom);
+        
+        
         //zoom in on center of visible portion achieved by extra translations
         translateX = previousX + (1-totalZoom/previousZoom)*(c.width/2-previousX);
         translateY = previousY + (1-totalZoom/previousZoom)*(c.height/2-previousY);
         clearFrame();
         oneFrame(currentI);
+    }
+    
+    function displayZoom(totalZoom){
+        setTimeout(function(){
+            $('#zoomlabel').html(parseInt(totalZoom*10)/10).position({
+                my: 'left center',
+                at: 'right center',
+                of: $('#zoomslider .ui-slider-handle'),
+                offset: '0,10'
+            });
+            $('#zoomlabel').css('padding-left','5px');
+        },5);
     }
     
     function pan(dx, dy) {
@@ -661,10 +674,10 @@ var Grapher = function() {
             translateX = nx, translateY = ny, totalZoom = nz;
             clearFrame();
             oneFrame(currentI);
-            $('#zoomslider').slider('value', nz);
-            $('#zoomlabel').html(parseInt(nz*10)/10);
             if(callback !== undefined)
                 callback();
+            displayZoom(totalZoom);
+            callback();
         }
         else {
             // Use the identity matrix while clearing the canvas
@@ -734,10 +747,10 @@ var Grapher = function() {
         paused=true;
         draw=clearInterval(draw);
         
-        var local = { 'currentTime': undefined, 
-                     'furthestPoint': undefined};
+//        var local = { 'currentTime': undefined, 
+//                     'furthestPoint': undefined};
         
-        localStorage[datafile]=JSON.stringify(local);
+        localStorage[datafile]=undefined;//JSON.stringify(local);
         
         
         root.find('.start').css('background-image',
@@ -787,7 +800,7 @@ var Grapher = function() {
         translateX = newTransform.tx;
         translateY = newTransform.ty;
         $('#zoomslider').slider('value', totalZoom);
-        $('#zoomlabel').html(parseInt(totalZoom*10)/10);
+        displayZoom(totalZoom);
         
         clearFrame();
         oneFrame(time);
@@ -821,6 +834,8 @@ var Grapher = function() {
         
         
         $('.sidecontrols').css('height',2*vidWidth/3);
+        $('#zoomslider').css('height','100%');
+        displayZoom(totalZoom);
         
         clearFrame();
         oneFrame(currentI);
@@ -871,9 +886,11 @@ var Grapher = function() {
             c.width=xmax * videoDim/scaleFactor;
             $('.sidecontrols').css({position: 'absolute',
                                     top: ($('.video').offset().top+'px'),
-                                    left: (($('.video').offset().left+$('.video').width()+10)+'px')});
+                                    left: (($('.video').offset().left+
+                                            $('.video').width()+10)+'px')});
             $('.controls').css({position: 'absolute',
-                                top: (($('.video').offset().top+$('.video').height()+10)+'px'),
+                                top: (($('.video').offset().top+
+                                       $('.video').height()+10)+'px'),
                                 left: ($('.video').offset().left+'px')});
         }
         
@@ -958,9 +975,12 @@ var Grapher = function() {
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='http://web.mit.edu/lilis/www/videolec/pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<div class='sidecontrols'>"
-        + "+<div id='zoomslider'></div>-"
-        + "<div id='zoomlabel'>1</div>"
-        + "Drag to Pan<div id='toggleDrag'></div>Drag to Zoom"
+        + "<div class='zoomControls'><span class='zoomlabel'>+</span>"
+        + "<div id='zoomslider'></div>"
+        + "<span class='zoomlabel' style='margin-top: -20px;'>-</span>"
+        + "<div id='zoomlabel'>1</div> </div>"
+        + "<div class='toggleControls'>Drag to Pan<div id='toggleDrag'></div>"
+        + "Drag to Zoom </div>"
         + "</div>"
         + "<br> <div class='controls'>"
         + "<div class='buttons'>"
@@ -976,8 +996,6 @@ var Grapher = function() {
         + "</div>"
         + "</div>";
     exports.initialize = function() {
-        //root = $("<div class='pentimento'></div>").appendTo($('body'));
-        //root.append(template);
         root=$('.pentimento');
         root.append(template);
         
@@ -1114,6 +1132,7 @@ var Grapher = function() {
         
         $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
         $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
+        
         $('.sidecontrols').css('position', 'absolute');
         
         $('#revertPos').on('click', function () {

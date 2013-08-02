@@ -406,6 +406,10 @@ var Grapher = function() {
     //displays one frame
     function oneFrame(current){
         
+        var actualfurthest = furthestpoint;
+        if(furthestpoint < current)
+            furthestpoint = current;
+        
         for(var i=0; i<numStrokes; i++){ //for all strokes
             var currentStroke = dataArray.visuals[i];
             var tmin = currentStroke.tMin;
@@ -483,6 +487,8 @@ var Grapher = function() {
                 }
             }
         }
+        
+        furthestpoint = actualfurthest;
     }
     
     //turns total seconds into a timestamp of minute:seconds

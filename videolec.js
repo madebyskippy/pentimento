@@ -601,18 +601,20 @@ var Grapher = function() {
     
     //triggered when mouse dragged across canvas
     function dragging(e) {
+        var x = e.pageX,
+            y = e.pageY;
         if(isDragging) {
             wasDragging = true;
             if(dragToPan) {
-                var newTx = (e.pageX-previousX);
-                var newTy = (e.pageY-previousY);
+                var newTx = (x-previousX);
+                var newTy = (y-previousY);
                 pan(newTx, newTy);
-                previousX = e.pageX;
-                previousY = e.pageY;
+                previousX = x;
+                previousY = y;
             }
             else {
-                zoomRectW = Math.max(offset.left, Math.min(e.pageX, offset.left+c.width))-previousX;
-                zoomRectH = Math.max(offset.top, Math.min(e.pageY, offset.top+c.height))-previousY;
+                zoomRectW = Math.max(offset.left, Math.min(x, offset.left+c.width))-previousX;
+                zoomRectH = Math.max(offset.top, Math.min(y, offset.top+c.height))-previousY;
                 if(zoomRectW/zoomRectH > c.width/c.height) //maintains aspect ratio of zoom region
                     zoomRectH = c.height/c.width*zoomRectW;
                 else
@@ -627,6 +629,44 @@ var Grapher = function() {
                                  (previousY-offset.top-translateY)/totalZoom,
                                  zoomRectW/totalZoom, zoomRectH/totalZoom);
             }
+        }
+        
+        //CHANGE THIS - for mouse move to show stuff in fullscreenmode
+        if(fullscreenMode) {
+            //NOT VISIBLE AND MOUSED OVER - SHOW
+            if(!controlsVisible & 
+               ((y > c.height-15 & 
+                 x > offset.left & 
+                 x < offset.left+c.width) | 
+                (x < offset.left+c.width & x > offset.left+c.width-15)))
+                animateControls(true);
+            //VISIBLE AND NOT MOUSED OVER - HIDE
+            if(controlsVisible & 
+               ((y < c.height-$('.controls').outerHeight(true) & 
+                 x < offset.left+c.width-$('.sidecontrols').outerWidth(true)) | 
+                x < offset.left | 
+                x > offset.left+c.width))
+                animateControls(false);
+        }
+    }
+    
+    var controlsVisible = true;
+    function animateControls(show) {
+        if(show) {
+            console.log('show');
+            $('.controls').show();
+            $('.controls').animate({opacity: 1},200);
+            $('.sidecontrols').show();
+            $('.sidecontrols').animate({opacity: 1},200);
+            controlsVisible = true;
+        }
+        else {
+            console.log('hide');
+            $('.controls').animate({opacity: 0},200);
+            setTimeout(function(){$('.controls').hide();},200);
+            $('.sidecontrols').animate({opacity: 0},200);
+            setTimeout(function(){$('.sidecontrols').hide();},200);
+            controlsVisible = false;
         }
     }
     
@@ -674,10 +714,9 @@ var Grapher = function() {
             translateX = nx, translateY = ny, totalZoom = nz;
             clearFrame();
             oneFrame(currentI);
+            displayZoom(totalZoom);
             if(callback !== undefined)
                 callback();
-            displayZoom(totalZoom);
-            callback();
         }
         else {
             // Use the identity matrix while clearing the canvas
@@ -819,13 +858,13 @@ var Grapher = function() {
         
         var buttonWidths=parseInt(vidWidth* 50 / 575);
         if (buttonWidths > 50 ) buttonWidths=50;
-        $('.buttons').css('width', buttonWidths+5);
+        $('.buttons').css('width', buttonWidths+75);
         $('.start').css('width',buttonWidths);
         $('.start').css('background-size',buttonWidths);
         $('.jumpForward').css('width',buttonWidths/2-2);
         $('.jumpBack').css('width',buttonWidths/2-2);
         
-        var timeControlWidth=parseInt(vidWidth)-buttonWidths-25;
+        var timeControlWidth=parseInt(vidWidth)-buttonWidths-75;
         $('.timeControls').css('width',timeControlWidth);
         $('#slider').css('width',timeControlWidth-150);
         $('#slider').css('margin-top',buttonWidths/2-5);
@@ -841,7 +880,7 @@ var Grapher = function() {
         oneFrame(currentI);
     }
     
-    var fullscreenMode = false;
+    var fullscreenMode = true;
     function resizeVisuals(){
         var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
@@ -862,7 +901,8 @@ var Grapher = function() {
         
         if(fullscreenMode) {
             $('body').css({padding: 0,
-                           margin: 0});
+                           margin: 0,
+                           overflow:'hidden'});
             $('body').find('.menulink').hide();
             c.height = windowHeight;
             c.width = xmax/ymax*c.height;
@@ -871,15 +911,19 @@ var Grapher = function() {
                 c.height = ymax/xmax*c.width;
             }
             $('.lecture').css({height: c.height,
-                               width: c.width});
+                               width: c.width,
+                               margin: 'auto auto'});
+            $('.sidecontrols').css('padding',10);
             $('.sidecontrols').css({position: 'absolute',
                                     top: 0,
-                                    left: ((c.width-$('.sidecontrols').width()-10)+'px'),
-                                    'background-color':'rgba(0,0,0,0.1)'});
+                                    left: (($('.video').offset().left+
+                                            $('.video').width()-
+                                            $('.sidecontrols').outerWidth(true))+'px'),
+                                    'background-color':'rgba(235,235,235,0.9)'});
             $('.controls').css({position: 'absolute',
-                                top: ((c.height-$('.controls').height()-10)+'px'),
-                                left: 0,
-                                'background-color':'rgba(0,0,0,0.1)'});
+                                top: ((c.height-$('.buttons').height())+'px'),
+                                left: $('.video').offset().left,
+                                'background-color':'rgba(235,235,235,0.9)'});
         }
         else {
             c.height=ymax * videoDim/scaleFactor;

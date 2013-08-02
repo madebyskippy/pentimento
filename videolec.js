@@ -928,7 +928,7 @@ var Grapher = function() {
                                             $('.sidecontrols').outerWidth(true))+'px'),
                                     'background-color':'rgba(235,235,235,0.9)'});
             $('.controls').css({position: 'absolute',
-                                top: ((c.height-$('.buttons').height())+'px'),
+                                top: ((c.height-$('.controls').outerHeight(true))+'px'),
                                 left: $('.video').offset().left,
                                 'background-color':'rgba(235,235,235,0.9)'});
         }

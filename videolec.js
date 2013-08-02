@@ -670,8 +670,11 @@ var Grapher = function() {
             "url('http://web.mit.edu/lilis/www/videolec/play.png')");
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
-        $('.onScreenStatus').css('visibility',"visible");
-        fadePauseSign();
+        
+        if (!paused){
+            $('.onScreenStatus').css('visibility',"visible");
+            fadePauseSign();
+        }
         
         paused=true;
         draw=clearInterval(draw);

@@ -714,6 +714,7 @@ var Grapher = function() {
             translateX = nx, translateY = ny, totalZoom = nz;
             clearFrame();
             oneFrame(currentI);
+            $('#zoomslider').slider('value',nz);
             displayZoom(totalZoom);
             if(callback !== undefined)
                 callback();
@@ -1019,21 +1020,26 @@ var Grapher = function() {
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='http://web.mit.edu/lilis/www/videolec/pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<div class='sidecontrols'>"
-        + "<div class='zoomControls'><span class='zoomlabel'>+</span>"
-        + "<div id='zoomslider'></div>"
-        + "<span class='zoomlabel' style='margin-top: -20px;'>-</span>"
-        + "<div id='zoomlabel'>1</div> </div>"
-        + "<div class='toggleControls'>Drag to Pan<div id='toggleDrag'></div>"
-        + "Drag to Zoom </div>"
+        + " <div class='zoomControls'><span class='zoomlabel'>+</span>"
+        + "     <div id='zoomslider'></div>"
+        + "     <span class='zoomlabel' style='margin-top: -20px;'>-</span>"
+        + "     <div id='zoomlabel'>1</div> </div>"
+        + " <div class='toggleControls'>"
+        + "     <div class='left'>drag: </div>"
+        + "     <div class='right'>"
+        + "         <div class='labels' id='pan'>pan</div>"
+        + "         <div class='labels' id='zoom'>zoom</div>"
+        + "         <div id='toggleDrag'></div></div>"
+        + " </div>"
         + "</div>"
         + "<br> <div class='controls'>"
-        + "<div class='buttons'>"
-        + "<input class='start' type='button'/>"
-        + "</div>"
-        + "<div class='timeControls'>"
-        + "<div id='slider'></div>"
-        + "<div id='totalTime'></div>"
-        + "</div>"
+        + " <div class='buttons'>"
+        + "     <input class='start' type='button'/>"
+        + " </div>"
+        + " <div class='timeControls'>"
+        + "     <div id='slider'></div>"
+        + "     <div id='totalTime'></div>"
+        + " </div>"
         + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "</audio>"
@@ -1153,6 +1159,14 @@ var Grapher = function() {
             min: -1, max: 1, step: 2, value: 1,
             slide: function(e, ui) {
                 dragToPan = ui.value > 0;
+                //true if dragging to pan
+                if (dragToPan) {
+                    $('.labels#pan').css('color','#000');
+                    $('.labels#zoom').css('color','#aaa');
+                } else{
+                    $('.labels#pan').css('color','#aaa');
+                    $('.labels#zoom').css('color','#000');
+                }
             }
         });
         

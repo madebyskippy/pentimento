@@ -85,8 +85,9 @@ var Grapher = function() {
         //get bounding box
         boundingRect.xmax = json.width;
         boundingRect.ymax = json.height;
-        for(i in json.visuals) {
-            var stroke = json.visuals[i].vertices;
+//        var totalReduction = 0;
+        for(k in json.visuals) {
+            var stroke = json.visuals[k].vertices;
             for(j in stroke) {
                 var point = stroke[j];
                 point.y = json.height-point.y;
@@ -95,27 +96,63 @@ var Grapher = function() {
                 if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
                 if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
             }
+            
+//            var orig = stroke.length;
+//            //simplify strokes
+//            var j=0;
+//            var step=5;
+//            while(j<stroke.length-step) {
+//                var sumDist = 0;
+//                var a = stroke[j];
+//                var c = stroke[j+step];
+//                var bx = c.x-a.x;
+//                var by = c.y-a.y;
+//                for(var i=j+1; i<j+step; i++) {
+//                    var b = stroke[i];
+//                    var ax = b.x-a.x;
+//                    var ay = b.y-a.y;
+//                    var dot = (ax*bx+ay*by)/(bx*bx+by*by);
+//                    var cx = ax-dot*bx;
+//                    var cy = ay-dot*by;
+//                    sumDist += Math.sqrt(cx*cx+cy*cy);
+//                }
+//                if(sumDist < 0.2) {
+//                    stroke.splice(j+1,step);
+//                    j--;
+//                }
+//                j++;
+//            }
+//            totalReduction += orig-stroke.length;
         }
+//        console.log(totalReduction);
 //        //divide into similar-direction polygons
+//        var totnews = 0;
 //        for(var i=0; i<json.visuals.length; i++) {
 //            var visual = json.visuals[i],
 //                stroke = visual.vertices,
 //                newStrokes = [];
 //            //find all breaking points
 //            var cosb;
-//            for(var j=0; j<stroke.length-1; j++) {
+//            var j=10;
+//            
+//            while(j<stroke.length-10) {
 //                var point = stroke[j],
 //                    next = stroke[j+1];
-//                var ab = getDistance(point.x, point.y, next.x, next.y),
-//                    bc = getDistance(next.x, next.y, next.x+1, next.y+1),
-//                    ac = getDistance(point.x, point.y, next.x+1, next.y+1);
-//                var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
-//                if(newcosb !== 0 & !isNaN(newcosb)) {
-//                    if(cosb !== undefined & newcosb/cosb < 0) {
-//                        newStrokes.push(j);
+//                var ab = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x), parseInt(next.y)),
+//                    bc = getDistance(parseInt(next.x), parseInt(next.y), parseInt(next.x+1), parseInt(next.y+1)),
+//                    ac = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x+1), parseInt(next.y+1));
+//                if(ab !== 0 & bc !== 0) {
+//                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
+//                    newcosb = parseInt(newcosb*1000)/1000;
+//                    if(Math.abs(newcosb) !== 0.316 & Math.abs(newcosb) !== 0.707 & !isNaN(newcosb)) {
+//                        if(cosb !== undefined & newcosb/cosb < 0) {
+//                            newStrokes.push(j);
+//                            totnews++;
+//                        }
+//                        cosb = newcosb;
 //                    }
-//                    cosb = newcosb;
 //                }
+//                j++;
 //            }
 //            if(newStrokes.length !== 0) {
 //                newStrokes.push(stroke.length-1);
@@ -134,6 +171,7 @@ var Grapher = function() {
 //                stroke = stroke.slice(0,newStrokes[0]+1);
 //            }
 //        }
+//        console.log(totnews);
         //invert y transforms
         for(i in json.cameraTransforms) {
             var transform = json.cameraTransforms[i];
@@ -275,7 +313,7 @@ var Grapher = function() {
         translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
-        if(paused) {
+        if(paused & totalZoom !== minZoom) {
             drawScrollBars(translateX, translateY, totalZoom);
         }
         
@@ -625,7 +663,8 @@ var Grapher = function() {
             oneFrame(currentI);
             $('#zoomslider').slider('value', nz);
             $('#zoomlabel').html(parseInt(nz*10)/10);
-            callback();
+            if(callback !== undefined)
+                callback();
         }
         else {
             // Use the identity matrix while clearing the canvas
@@ -787,7 +826,7 @@ var Grapher = function() {
         oneFrame(currentI);
     }
     
-    
+    var fullscreenMode = false;
     function resizeVisuals(){
         var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
@@ -805,18 +844,43 @@ var Grapher = function() {
             videoDim=windowWidth-125;
             var scaleFactor=xmax;
         }
-        c.height=ymax * videoDim/scaleFactor;
-        c.width=xmax * videoDim/scaleFactor;
+        
+        if(fullscreenMode) {
+            $('body').css({padding: 0,
+                           margin: 0});
+            $('body').find('.menulink').hide();
+            c.height = windowHeight;
+            c.width = xmax/ymax*c.height;
+            if(c.width > windowWidth) {
+                c.width = windowWidth;
+                c.height = ymax/xmax*c.width;
+            }
+            $('.lecture').css({height: c.height,
+                               width: c.width});
+            $('.sidecontrols').css({position: 'absolute',
+                                    top: 0,
+                                    left: ((c.width-$('.sidecontrols').width()-10)+'px'),
+                                    'background-color':'rgba(0,0,0,0.1)'});
+            $('.controls').css({position: 'absolute',
+                                top: ((c.height-$('.controls').height()-10)+'px'),
+                                left: 0,
+                                'background-color':'rgba(0,0,0,0.1)'});
+        }
+        else {
+            c.height=ymax * videoDim/scaleFactor;
+            c.width=xmax * videoDim/scaleFactor;
+            $('.sidecontrols').css({position: 'absolute',
+                                    top: ($('.video').offset().top+'px'),
+                                    left: (($('.video').offset().left+$('.video').width()+10)+'px')});
+            $('.controls').css({position: 'absolute',
+                                top: (($('.video').offset().top+$('.video').height()+10)+'px'),
+                                left: ($('.video').offset().left+'px')});
+        }
+        
         yscale=(c.height)/ymax;
         xscale=(c.width)/xmax;
         offset = root.find('.video').offset();
         resizeControls(c.width);
-        $('.sidecontrols').css({position: 'absolute',
-                                top: ($('.video').offset().top+'px'),
-                                left: (($('.video').offset().left+$('.video').width()+10)+'px')});
-        $('.controls').css({position: 'absolute',
-                            top: (($('.video').offset().top+$('.video').height()+10)+'px'),
-                            left: ($('.video').offset().left+'px')})
         
         var onScreenStatusWidth=c.width * 80/575;
         $('.onScreenStatus').css('margin-top', -c.height/2-onScreenStatusWidth/2);
@@ -890,7 +954,7 @@ var Grapher = function() {
         else onTouch();
     }
     
-    var template="<a href='index.html'>back to menu</a><br><div class='lecture'>"
+    var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='http://web.mit.edu/lilis/www/videolec/pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<div class='sidecontrols'>"
@@ -1012,7 +1076,13 @@ var Grapher = function() {
             wasDragging = true;
         });
         
-        readFile(datafile,getData); //dataPoints now filled with data
+        function checkForAudio() {
+            if(audio.readyState === 4 | !isAudio)
+                readFile(datafile,getData);
+            else
+                setTimeout(checkForAudio, 50);
+        }
+        checkForAudio();
         
         root.find('.jumpForward').on('click',jumpForward);
         root.find('.jumpBack').on('click',jumpBack);

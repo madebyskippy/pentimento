@@ -1,8 +1,3 @@
-.video{
-    border:1px solid #eee;
-    cursor: default;
-}
-
 body{
     padding:50px;
     font-family: sans-serif;
@@ -12,6 +7,11 @@ body{
     -moz-user-select: moz-none;
     -ms-user-select: none;
     user-select: none;
+}
+
+.video{
+    border:1px solid #eee;
+    cursor: default;
 }
 
 .controls{
@@ -53,6 +53,25 @@ input[type='button']:focus{
     opacity:1;
 }
 
+.timeControls{
+    float:right;
+    width:375px;
+}
+
+#slider{
+    width:300px;
+    float:left;
+    margin-top:20px;
+    margin-left:10px;
+}
+
+.time{
+    margin-top:20px;
+    float:left;
+    width:50px;
+    text-align:right;
+}
+
 #slider .tick {
     z-index:1;
     background: #4f3;
@@ -61,7 +80,7 @@ input[type='button']:focus{
     height: 100%;
     width: 2px;
     left: 0%;
-    alt: 'furthest point'
+    opacity: .3;
 }
 
 #slider .ui-slider-handle {
@@ -85,40 +104,6 @@ input[type='button']:focus{
     background-image: url('http://web.mit.edu/lilis/www/videolec/stop.png');
 }
 
-.timeControls{
-    float:right;
-    width:375px;
-}
-
-#slider{
-    width:300px;
-    float:left;
-    margin-top:20px;
-    margin-left:10px;
-}
-
-.time{
-    margin-top:20px;
-    float:left;
-    width:50px;
-    text-align:right;
-}
-
-.sidecontrols{
-    display:inline-block;
-    margin-left:10px;
-}
-
-#zoomslider{
-     height:50%;
-}
-
-#toggleDrag{
-    margin-top: 10px;
-    margin-bottom: 10px;
-    height: 30px;
-}
-
 #totalTime{
     margin-top:20px;
     float:right;
@@ -133,4 +118,51 @@ input[type='button']:focus{
 .jumpForward{
     width:25px;
     margin:1px;
+}
+
+.onScreenStatus{
+    position: absolute;
+    z-index:5;
+    visibility: hidden;
+}
+
+.sidecontrols{
+    display:inline-block;
+    margin-left:10px;
+}
+
+#zoomslider .ui-slider-vertical{
+    height:80%;
+    background: #f00;
+}
+
+.zoomlabel{
+    font-family: monospace;
+    position:absolute;
+    z-index:1;
+    text-align: center;
+    margin-left:3px;
+    padding:1px;
+}
+
+#zoomlabel{
+    position:absolute;
+    height:15px;
+}
+
+.zoomControls{
+    height: 50%;
+    margin-bottom:10px;
+}
+
+#toggleDrag{
+    margin-top: 10px;
+    margin-bottom: 10px;
+    height: 30px;
+}
+
+.toggleControls{
+    margin-top:10px;
+    margin-bottom:10px;
+    font-size: 12px;
 }

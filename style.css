@@ -1,5 +1,7 @@
 body{
     padding:50px;
+    margin: 0;
+    overflow: hidden;
     font-family: sans-serif;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -129,6 +131,7 @@ input[type='button']:focus{
 .sidecontrols{
     display:inline-block;
     margin-left:10px;
+    padding: 10px;
 }
 
 .zoomlabel{

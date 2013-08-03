@@ -20,6 +20,9 @@ var Grapher = function() {
     var zoomRectW = 0, zoomRectH = 0;
     var offset;
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
+    var fullscreenMode = true;
+    var controlsVisible = true;
+    var freePosition = false;
     
     //LIMITS ON THINGS
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
@@ -327,33 +330,37 @@ var Grapher = function() {
     }
     
     function getTransform(time) {
-        var newTransform = {};
-        
-        if (dataArray != undefined) {
-            var cameraChanges = dataArray.cameraTransforms;
-            var nextTransform = cameraChanges[cameraChanges.length-1];
-            var previousTransform = cameraChanges[0];
-            for(var i=0; i< cameraChanges.length; i++){
-                var currentTransform = cameraChanges[i];
-                if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
-                    previousTransform = currentTransform;
+        if(!freePosition) {
+            var newTransform = {};
+            
+            if (dataArray != undefined) {
+                var cameraChanges = dataArray.cameraTransforms;
+                var nextTransform = cameraChanges[cameraChanges.length-1];
+                var previousTransform = cameraChanges[0];
+                for(var i=0; i< cameraChanges.length; i++){
+                    var currentTransform = cameraChanges[i];
+                    if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
+                        previousTransform = currentTransform;
+                    }
+                    if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
+                        nextTransform = currentTransform;
+                    }
                 }
-                if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
-                    nextTransform = currentTransform;
+                newTransform = jQuery.extend(true,{},previousTransform);
+                if (nextTransform.time !== previousTransform.time) {
+                    var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
+                    newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
+                    newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
+                    newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
                 }
+                newTransform.tx = newTransform.tx/newTransform.m11*xscale;
+                newTransform.ty = newTransform.ty/newTransform.m11*yscale;
             }
-            newTransform = jQuery.extend(true,{},previousTransform);
-            if (nextTransform.time !== previousTransform.time) {
-                var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
-                newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
-                newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
-                newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
-            }
-            newTransform.tx = newTransform.tx/newTransform.m11*xscale;
-            newTransform.ty = newTransform.ty/newTransform.m11*yscale;
+            
+            return newTransform;
         }
-        
-        return newTransform;
+        else
+            return {tx: translateX, ty: translateY, m11: totalZoom};
     }
     
     function graphData(){
@@ -599,7 +606,7 @@ var Grapher = function() {
         isDragging = true;
         previousX = e.pageX;
         previousY = e.pageY;
-        if(!wasDragging)
+        if(!wasDragging & !freePosition)
             initialPause=paused;
             pause(); // only pauses the first time
         wasDragging = false;
@@ -656,7 +663,6 @@ var Grapher = function() {
         }
     }
     
-    var controlsVisible = true;
     function animateControls(show) {
         if(show) {
             console.log('show');
@@ -887,7 +893,6 @@ var Grapher = function() {
         oneFrame(currentI);
     }
     
-    var fullscreenMode = true;
     function resizeVisuals(){
         var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
@@ -907,9 +912,7 @@ var Grapher = function() {
         }
         
         if(fullscreenMode) {
-            $('body').css({padding: 0,
-                           margin: 0,
-                           overflow:'hidden'});
+            $('body').css('padding', 0);
             $('body').find('.menulink').hide();
             c.height = windowHeight;
             c.width = xmax/ymax*c.height;
@@ -920,7 +923,6 @@ var Grapher = function() {
             $('.lecture').css({height: c.height,
                                width: c.width,
                                margin: 'auto auto'});
-            $('.sidecontrols').css('padding',10);
             $('.sidecontrols').css({position: 'absolute',
                                     top: 0,
                                     left: (($('.video').offset().left+
@@ -933,12 +935,17 @@ var Grapher = function() {
                                 'background-color':'rgba(235,235,235,0.9)'});
         }
         else {
+            $('body').css('padding', '50px');
+            $('body').find('.menulink').show();
             c.height=ymax * videoDim/scaleFactor;
             c.width=xmax * videoDim/scaleFactor;
+            $('.lecture').css({height: 'auto',
+                               width: 'auto'});
             $('.sidecontrols').css({position: 'absolute',
                                     top: ($('.video').offset().top+'px'),
                                     left: (($('.video').offset().left+
-                                            $('.video').width()+10)+'px')});
+                                            $('.video').width()+10)+'px'),
+                                    'background-color':'none'});
             $('.controls').css({position: 'absolute',
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
@@ -970,12 +977,19 @@ var Grapher = function() {
         var move = input.move;
         var up = input.up;
         var double = input.double;
+        var touch = input.touch;
         var tolerance = input.tolerance;
         var doubled = false;
         function onTouch() {
             element.on('touchend', listenTouch);
-            element.on('touchstart', function(e) {down(e.originalEvent.touches[0]);});
-            element.on('touchmove', function(e) {move(e.originalEvent.touches[0]);});
+            element.on('touchstart', function(e) {
+                down(e.originalEvent.touches[0]);
+            });
+            element.on('touchmove', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                move(e.originalEvent.touches[0]);
+            });
         }
         function onClick() {
             element.on('mouseup', listenClick);
@@ -994,7 +1008,7 @@ var Grapher = function() {
             },tolerance);
             element.on('touchend', function() {
                 clearTimeout(click);
-                double();
+                double(e);
                 doubled = true;
                 element.off('touchend');
                 onTouch();
@@ -1018,8 +1032,22 @@ var Grapher = function() {
                 onClick();
             });
         }
-        if(!input.touch) onClick();
+        if(!touch) onClick();
         else onTouch();
+        
+        var exports = {
+            off: function() {
+                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
+            },
+            toggle: function() {
+                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
+                touch = !touch;
+                if(!touch) onClick();
+                else onTouch();
+            }
+        };
+        
+        return exports;
     }
     
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
@@ -1102,7 +1130,7 @@ var Grapher = function() {
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-        doubleClickHandler({
+        var doubleClick = doubleClickHandler({
             element: $(window),
             down: function(e) {
                 if(e.target === c)
@@ -1133,7 +1161,7 @@ var Grapher = function() {
         c.addEventListener('mousewheel', function(e){
             e.preventDefault();
             e.stopPropagation();
-            if(!wasDragging)
+            if(!wasDragging & !paused & !freePosition)
                 pause();
             if(!dragToPan) {
                 var scroll = e.wheelDeltaY;
@@ -1196,17 +1224,28 @@ var Grapher = function() {
         
         $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
         $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
+        $('.sidecontrols').append('<br><button id="fullscreen">Exit FS</button>');
+        $('.sidecontrols').append('<br><button id="touch">Touch</button>');
         
         $('.sidecontrols').css('position', 'absolute');
         
         $('#revertPos').on('click', function () {
-            if(!paused) pause();
+            if(!paused & !freePosition) pause();
             var next = getTransform(currentI);
             animateToPos(Date.now(), 200, next.tx, next.ty, next.m11);
         });
         $('#seeAll').on('click', function() {
-            if(!paused) pause();
+            if(!paused & !freePosition) pause();
             animateToPos(Date.now(), 200, 0, 0, minZoom);
+        });
+        $('#fullscreen').on('click', function() {
+            fullscreenMode = !fullscreenMode;
+            $(this).html(fullscreenMode?"Exit FS":"Fullscreen");
+            resizeVisuals();
+        });
+        $('#touch').on('click', function() {
+            $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
+            doubleClick.toggle();
         });
                 
         root.find('.start').on('click',function() {
@@ -1224,8 +1263,11 @@ var Grapher = function() {
                 //trigger button click
                 root.find('.start').click();
             }
+            if (event.keyCode==102) {
+                freePosition = !freePosition;
+                console.log(freePosition);
+            }
         });
-        
         
         console.log(localStorage);
         

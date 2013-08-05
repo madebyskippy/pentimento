@@ -492,22 +492,6 @@ var Grapher = function() {
         oneFrame(val);
     }
     
-    //triggered after a user stops sliding
-    function sliderStop(event, ui){
-        if (paused){ //if it was paused, don't do anything
-            return;
-        }
-        paused=true; //only starts if it was previously paused
-        start();
-    }
-    
-    //triggered when user starts sliding
-    function sliderStart(event, ui){
-        var initialPause=paused;
-        pause();
-        paused=initialPause;
-    }
-    
     //triggered when zoom slider is clicked
     function zoomStart() {
         wasDragging = true;

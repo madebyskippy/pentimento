@@ -750,17 +750,16 @@ var Grapher = function() {
     function start(){
         if(paused){
             $('#zoomslider').slider({disabled:true});
+            $('#timeStampURL').attr("disabled",true);
+            $('#screenshotURL').attr("disabled",true);
             wasDragging = false;
             root.find('.start').css('background-image',
-                "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
+                "url('pause.png')");
             $('#slider .ui-slider-handle').css('background','#0b0');
             root.find('.video').css('border','1px solid #eee');
             
-            $('#pauseIcon').attr("src",
-                'http://web.mit.edu/lilis/www/videolec/play_big.png');
-            $('.onScreenStatus').css('opacity',".5");
-            $('.onScreenStatus').css('visibility',"visible");
-            fadeSign();
+            $('#pauseIcon').attr("src",'play_big.png');
+            fadeSign('pause_big.png');
             
             paused=false;
             setTime=false;
@@ -774,17 +773,16 @@ var Grapher = function() {
     
     function pause(){
         $('#zoomslider').slider({disabled:false});
+        $('#timeStampURL').attr("disabled",false);
+        $('#screenshotURL').attr("disabled",false);
         root.find('.start').css('background-image',
-            "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+            "url('play.png')");
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
         
         if (!paused){
-            $('#pauseIcon').attr("src",
-                'http://web.mit.edu/lilis/www/videolec/pause_big.png');
-            $('.onScreenStatus').css('opacity',".5");
-            $('.onScreenStatus').css('visibility',"visible");
-            fadeSign();
+            $('#pauseIcon').attr("src",'pause_big.png');
+            fadeSign('play_big.png');
         }
         
         paused=true;
@@ -807,7 +805,7 @@ var Grapher = function() {
         
         
         root.find('.start').css('background-image',
-            "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+            "url('play.png')");
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
         
@@ -820,13 +818,15 @@ var Grapher = function() {
         offsetTime=0;
     }
     
-    function fadeSign(){
+    function fadeSign(nextImg){
+        $('.onScreenStatus').css('visibility',"visible");
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').animate({
             opacity: 0
         },1000,function(){
             $('.onScreenStatus').css('visibility',"hidden");
             $('.onScreenStatus').css('opacity',".5");
+            $('#pauseIcon').attr('src',nextImg);
         });
     }
     
@@ -912,7 +912,7 @@ var Grapher = function() {
             var scaleFactor=ymax;
         }
         else {
-            videoDim=windowWidth-125;
+            videoDim=windowWidth-185;
             var scaleFactor=xmax;
         }
         
@@ -967,11 +967,7 @@ var Grapher = function() {
         $('#pauseIcon').css('width',onScreenStatusWidth+"px");
         $('#pauseIcon').css('height',onScreenStatusWidth+"px");
         $('.onScreenStatus').css('opacity',".5");
-        if (paused && currentTime != 0){ //paused but has been started at some point
-            $('.onScreenStatus').css('visibility',"visible");
-        }else {
-            $('.onScreenStatus').css('visibility',"hidden");
-        }
+        $('.onScreenStatus').css('visibility',"hidden");
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -1069,7 +1065,7 @@ var Grapher = function() {
     
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
-        + "<div class='onScreenStatus'> <img src='http://web.mit.edu/lilis/www/videolec/pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
+        + "<div class='onScreenStatus'> <img src='pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<div class='sidecontrols'>"
         + " <div class='zoomControls'><span class='zoomlabel'>+</span>"
         + "     <div id='zoomslider'></div>"
@@ -1255,6 +1251,11 @@ var Grapher = function() {
         $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
         $('.sidecontrols').append('<br><button id="fullscreen">Fullscreen</button>');
         $('.sidecontrols').append('<br><button id="touch">Touch</button>');
+        $('.sidecontrols').append('<br><br><textarea id="URLs" ' +
+                                  'readonly="readonly" rows="3" '+
+                                  'cols="8" wrap="soft"></textarea>');
+        $('.sidecontrols').append('<br><button id="timeStampURL">current URL</button>');
+        $('.sidecontrols').append('<br><button id="screenshotURL">screenshot</button>');
         
         $('.sidecontrols').css('position', 'absolute');
         
@@ -1284,6 +1285,15 @@ var Grapher = function() {
         $('#touch').on('click', function() {
             $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
             doubleClick.toggle();
+        });
+        $('#timeStampURL').on('click',function(){
+            var url = window.location.origin + window.location.pathname
+            url = url + '?n='+ getURLParameter('n',location.search);
+            $('#URLs').val(url+'&t='+currentI);
+        });
+        $('#screenshotURL').on('click',function(){
+            var dataURL=c.toDataURL("image/png");
+            window.open(dataURL);
         });
                 
         root.find('.start').on('click',function() {

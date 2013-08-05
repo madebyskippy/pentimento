@@ -10,19 +10,55 @@ var Grapher = function() {
     var xmax=1100;
     var yscale;
     var xscale;
-    var previousZoom = 1;
     var translateX = 0;
     var translateY = 0;
     var totalZoom = 1;
+    var previousX, previousY, previousZoom;
+    var isPanning = false; //true if currently panning/zooming
+    var wasPanning = false; //true if currently paused and panning/zooming
     
     var audio;
+    var isAudio=true;
     
-    var lines = new Array();
-    var patterns = [/[numberofPrimitives=][0-9]+/ig, 
-                    /[numberofVertices=][0-9]+/ig, 
-                    /[0-9.]+/ig];
-    var dataPoints = new Array();
-    //array of strokes. one stroke is an array of [x,y,t],[x,y,t],...
+    var furthestpoint=0; // furthest point in seconds
+    
+    var isZoomPlay=false;
+    
+    /***********the dataArray object****************
+        durationInSeconds: number
+        height: number
+        width: number
+        cameraTransforms: [ { m11: number,
+                              m12: number,
+                              m21: number,
+                              m22: number,
+                              time: number,
+                              tx: number,
+                              ty: number,
+                            }, {} ...]
+        pageFlips: [ { page: number,
+                       time: number
+                     }, {} ...]
+        visuals: [ { doesItGetDeleted: boolean,
+                     tDeletion: number,
+                     tEndEdit: number,
+                     tMin: number,
+                     type: string ( "stroke" )
+                     properties: [ { alpha: number,
+                                     alphaFill: number, 
+                                     blue: number, 
+                                     blueFill: number, 
+                                     green: number, 
+                                     greenFill: number, 
+                                     red: number, 
+                                     redFill: number, 
+                                     thickness: number, 
+                                     time: number, 
+                                     type: string ( "basicProperty" )
+                                    }, {}...]
+                     verticies: [ {x: number, y: number, t: number, pressure: number}, {}...]
+                   }, {} ...]
+    */
     
     var imax;	// maximum time value
     
@@ -32,41 +68,28 @@ var Grapher = function() {
     var offsetTime=0; //for use with pause
     var paused=true;
     var setTime=false; //true if time was set by slider or strokeFinding
-    var wasPanning = false; //true if currently panning/zooming
     var draw;
     
     var numStrokes=0;
     var dataArray;
     
-    /*
-        how the json is organized:
-        array of stroke objects
-        stroke: {
-            verticies: [ {"x": 0, "y": 0, "t": 0, "pressure":0}, {} ...],
-            properties: [ {"type": "", "time": 0, "thickness":0, "color":0..., "colorfill": 0...}, {} ...]
-        }
-        length: 0 (length of total lecture in seconds)
-        height: 0
-        width: 0 (both of the lecture screen)
-    */
-    
     // updates lines and dataPoints with new file
     function getData(file) {
         console.log(JSON.parse(file.responseText));
         dataArray = JSON.parse(file.responseText);
-        //REPLACE dataPoints WITH dataArray!!!!!!!!!!!!!!!
-        console.log(dataArray.strokes[0]);
-        imax = dataArray.strokes.length;
+        imax = dataArray.durationInSeconds;
+        xmax=dataArray.width;
+        ymax=dataArray.height;
+        resizeVisuals();
         console.log("imax: "+imax);
         $('#slider').slider("option","max",imax);
         slider.max=imax;
-        numStrokes=dataArray.strokes.length;
+        numStrokes=dataArray.visuals.length;
     }
 
 	function readFile(url, callback) {
 		var txtFile = new XMLHttpRequest();
 		txtFile.open("GET", url, true);	
-		//txtFile.setRequestHeader('User-Agent','XMLHTTP/1.0');
 		txtFile.onreadystatechange = function() {
 			if (txtFile.readyState != 4) {return;}  // document is ready to parse.	
 			if (txtFile.status != 200 && txtFile.status != 304) {return;}  // file is found
@@ -83,36 +106,32 @@ var Grapher = function() {
         y=(c.height-y)/yscale;
         var minDistance=5; //if the point is further than this then ignore it
         var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
-        var done=false;
         for(var i=0; i<numStrokes; i++){
-            var currentStroke=dataArray.strokes[i];
-            for(var j=0;j<currentStroke.length; j++){
-                if (currentStroke[j][2]<currentI){
+            var currentStroke=dataArray.visuals[i];
+            for(var j=0;j<currentStroke.vertices.length; j++){
+                if (currentStroke.vertices[j].t<currentI){
                     //check closeness of x,y to this current point
-                    var dist = getDistance(x,y,currentStroke[j][0],currentStroke[j][1])
+                    var dist = getDistance(x,y,currentStroke.vertices[j].x,
+                                           currentStroke.vertices[j].y)
                     if (dist<closestPoint.distance){
                         closestPoint.distance=dist;
                         closestPoint.stroke=i;
                         closestPoint.point=j;
-                        closestPoint.time=currentStroke[j][2];
+                        closestPoint.time=currentStroke.vertices[j].t;
                     }
-                }else{
-                    done=true;
-                    break;
                 }
             }
-            if (done) break;
         }
         
         console.log(closestPoint);
         if (closestPoint.stroke!= -1){ //it found a close enough point
-            var time=parseFloat(dataPoints[closestPoint.stroke][0][2]); //TODO: CHANGE TO NEW DATA ARRAY
+            var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             offsetTime=time*1000;
             setTime=true;
-            context.clearRect(0,0,c.width,c.height);
+            clearFrame();
             oneFrame(time);
             changeSlider(time);
-            audio.currentTime=time;
+            if (isAudio) audio.currentTime=time;
         }
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
@@ -120,23 +139,70 @@ var Grapher = function() {
         }
     }
     
+    function clearFrame() {
+        // Use the identity matrix while clearing the canvas
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, c.width, c.height);
+        
+        // Restore the transform
+        context.setTransform(totalZoom,0,0,totalZoom,
+                             translateX,translateY);
+    }
+    
     function getDistance(x1,y1,x2,y2){
         return Math.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
     }
     
+    function getTransform(time) {
+        var newTransform = {};
+        
+        if (dataArray != undefined) {
+            var cameraChanges = dataArray.cameraTransforms;
+            var nextTransform = cameraChanges[cameraChanges.length-1];
+            var previousTransform = cameraChanges[0];
+            for(var i=0; i< cameraChanges.length; i++){
+                var currentTransform = cameraChanges[i];
+                if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
+                    previousTransform = currentTransform;
+                }
+                if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
+                    nextTransform = currentTransform;
+                }
+            }
+            newTransform = jQuery.extend(true,{},previousTransform);
+            if (nextTransform.time !== previousTransform.time) {
+                console.log(nextTransform.tx, previousTransform.tx);
+                var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
+                newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
+                newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
+                newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
+                newTransform.tx = newTransform.tx/newTransform.m11;
+                newTransform.ty = newTransform.ty/newTransform.m11;
+            }
+        }
+        
+        return newTransform;
+    }
+    
     function graphData(){
-		context.clearRect(0,0,c.width,c.height);
 		currentTime=Date.now(); //gets current time
 		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
 		changeSlider(currentI);
+        
+        var newTransform = getTransform(currentI);
+        totalZoom = newTransform.m11;
+        translateX = newTransform.tx;
+        translateY = newTransform.ty;
+        $('#slider-vertical').slider('value', totalZoom);
+        $('#zoomlabel').html(totalZoom);
+        clearFrame();
         oneFrame(currentI);
         if (currentI>imax) stop();
 	}
     
-/*************I MADE CHANGES 7/24*****************/    
     //draw a parallelogram for each pair of points
-    function calligraphize(context, x, y) {
-        var penWidth = 4*xscale;
+    function calligraphize(x, y, pressure) {
+        var penWidth = 32*pressure*context.lineWidth;
         context.lineTo(x-penWidth,y+penWidth);
         context.lineTo(x,y);
         context.closePath();
@@ -144,32 +210,73 @@ var Grapher = function() {
         context.lineTo(x-penWidth,y+penWidth);
     }
     
-    //CHANGE TO WORK WITH NEW DATA!!!!
+    //displays one frame
     function oneFrame(current){
-        var done=false;
-        for(var i=0; i<numStrokes; i++){
-			//var data = dataPoints[i];
-            var data = dataArray.strokes[i].vertices;
-			context.beginPath();
-            context.lineWidth = xscale/8;
-//			context.moveTo((data[0][0]*xscale),ymax*yscale-data[0][1]*yscale);
-			
-			for (var j = 0; j < data.length; j++) {
-				if (data[j].t < current){
-					var x=data[j].x*xscale
-					var y=data[j].y*yscale	
-//					context.lineTo(x,ymax*yscale-y);
-                    calligraphize(context,x,ymax*yscale-y);
-				}else {
-                    done=true;
-					break;}
-			}
-            context.fill();
-            context.stroke();
-            if (done) break;
+        
+        for(var i=0; i<numStrokes; i++){ //for all strokes
+            var currentStroke = dataArray.visuals[i];
+            var tmin = currentStroke.tMin;
+            var deleted=false;
+            
+            if(tmin < current){
+                var data = currentStroke.vertices;
+             
+                context.beginPath();
+                
+                //process the properties
+                var properties= currentStroke.properties;
+                for(var k=0; k< properties.length; k++){ //for all properties of the stroke
+                    var property=properties[k];
+                    if (property.time < current) { //if property is to be shown
+                        var fadeIndex = 1;
+                        if(property.type === "fadingProperty") { //calculate fade rate
+                            var timeBeginFade = currentStroke.tDeletion+
+                                property.timeBeginFade;
+                            var fadeDuration = property.durationOfFade;
+                            fadeIndex -= (current-timeBeginFade)/fadeDuration;
+                            if(fadeIndex < 0)
+                                deleted = true;
+                        }
+                        if(property.type === "basicProperty") { //normal property
+                            if(currentStroke.tDeletion < current)
+                                deleted = true;
+                        }
+                        
+                        if(!deleted || !currentStroke.doesItGetDeleted) { //add properties
+                            var r=parseFloat(property.redFill) * 255;
+                            var g=parseFloat(property.greenFill) * 255;
+                            var b=parseFloat(property.blueFill) * 255;
+                            context.fillStyle="rgba("+r+","+g+
+                                              ","+b+","+(property.alphaFill*fadeIndex)+")";
+                            
+                            r=parseFloat(property.red) * 255;
+                            g=parseFloat(property.green) * 255;
+                            b=parseFloat(property.blue) * 255;
+                            context.strokeStyle="rgba("+r+","+g+
+                                              ","+b+","+(property.alpha*fadeIndex)+")";
+                            
+                            context.lineWidth = property.thickness*xscale/50;
+                        }
+                    }
+                }
+                
+                //draw the stroke
+                if (!deleted || !currentStroke.doesItGetDeleted){
+                    for (var j = 0; j < data.length; j++) { //for all verticies
+                        if (data[j].t < current){
+                            var x=data[j].x*xscale;
+                            var y=data[j].y*yscale;
+                            var pressure = data[j].pressure;
+                            calligraphize(x,ymax*yscale-y,pressure);
+                        }
+                    }
+                    
+                    context.fill();
+                    context.stroke();
+                }
+            }
         }
     }
-/***************END CHANGES*******************/
     
     function changeSlider(current){
         if (current<imax){ 
@@ -181,6 +288,13 @@ var Grapher = function() {
             var zeros='';
             if (seconds % 1 === 0 ) zeros='.0';
             root.find('.time').html(minutes+":"+seconds+zeros);
+            
+            //update ticks
+            if (current > furthestpoint){
+                furthestpoint=current;
+                var percentage = (furthestpoint)/imax * 100;
+                $('.tick').css('left', percentage + '%');
+            }
         }
     }
     
@@ -191,10 +305,18 @@ var Grapher = function() {
         setTime=true;
         offsetTime=pausedTime;
         currentI=val;
-		context.clearRect(0,0,c.width,c.height);
+        
+//        var newTransform = getTransform(currentI);
+//        totalZoom = newTransform.m11;
+//        translateX = newTransform.tx;
+//        translateY = newTransform.ty;
+//        $('#slider-vertical').slider('value', totalZoom);
+//        $('#zoomlabel').html(totalZoom);
+        
+        clearFrame();
         oneFrame(val);
         changeSlider(val);
-        //audio.currentTime=val;
+        if (isAudio) audio.currentTime=val;
     }
     
     //triggered after a user stops sliding
@@ -213,32 +335,104 @@ var Grapher = function() {
         paused=initialpause;
     }
     
-    function start(){
-        if(paused){
-            //I MADE CHANGES 7/24
-            context.restore();
-            //7/25
-            $('#slider-vertical').slider({disabled:true,value:1});
-            $('#zoomlabel').html(1);
-            previousZoom = 1;
-            translateX = 0;
-            translateY = 0;
-            totalZoom = 1;
-            wasPanning = false;
-            
+    //triggered when zoom slider is clicked
+    function zoomStart() {
+        wasPanning = true;
+        previousX = translateX;
+        previousY = translateY;
+        previousZoom = totalZoom;
+    }
+    
+    //triggered when zoom slider is changed
+    function zooming(event, ui) {
+        totalZoom = ui.value;
+        $('#zoomlabel').html(totalZoom);
+        translateX = previousX + (1-totalZoom/previousZoom)*(c.width/2-previousX);
+        translateY = previousY + (1-totalZoom/previousZoom)*(c.height/2-previousY);
+        clearFrame();
+        oneFrame(currentI);
+    }
+    
+    //triggered when mouse pressed on canvas
+    function dragStart(e) {
+        isPanning = true;
+        previousX = e.x;
+        previousY = e.y;
+        if(!wasPanning) {
+            pause();
+        }
+        wasPanning = false;
+    }
+    
+    //triggered when mouse dragged across canvas
+    function dragging(e) {
+        if(isPanning) {
+            wasPanning = true;
+            var newTx = (e.x-previousX);
+            var newTy = (e.y-previousY);
+            translateX += newTx;
+            translateY += newTy;
+            clearFrame();
+            oneFrame(currentI);
+            previousX = e.x;
+            previousY = e.y;
+        }
+    }
+    
+    //triggered when mouse released on canvas
+    function dragStop(e) {
+        isPanning = false;
+        
+        if(!wasPanning) {
+            paused = false;
+            var mx=e.pageX;
+            var my=e.pageY;
+            var offset=root.find('.video').offset(); //array of left and top
+            mx=Math.round((mx-offset.left-translateX)/totalZoom);
+            my=Math.round((my-offset.top-translateY)/totalZoom);
+            selectStroke(mx,my);
+        }
+    }
+    
+    //animates back to playing position before playing
+    function animateToPlay(startTime, duration, tx, ty, tz, next) {
+        var interpolatedTime = (Date.now() - startTime)/duration;
+        
+        if(interpolatedTime >= 1 | (tx === next.tx & ty === next.ty & tz === next.m11)) {
+            $('#slider-vertical').slider('value', totalZoom);
+            $('#zoomlabel').html(totalZoom);
             paused=false;
             setTime=false;
             initialTime=Date.now()-offsetTime;
             draw=setInterval(graphData,50);
             audio.play();
         }
+        else {
+            c.width = c.width;
+            var newZoom = tz+(next.m11 - tz)*interpolatedTime;
+            var newX = (tx+(next.tx - tx)*interpolatedTime);
+            var newY = (ty+(next.ty - ty)*interpolatedTime);
+            context.setTransform(newZoom,0,0,newZoom,
+                                 newX,newY);
+            oneFrame(currentI);
+            
+            setTimeout(function() {
+                animateToPlay(startTime, duration, tx, ty, tz, next);
+            }, 10);
+        }
+    }
+    
+    function start(){
+        if(paused){
+            $('#slider-vertical').slider({disabled:true});
+            wasPanning = false;
+            
+            var newTransform = getTransform(currentI);
+            animateToPlay(Date.now(), 200, translateX, translateY, totalZoom, newTransform);
+        }
     }
     
     function pause(){
-        //I MADE CHANGES 7/24
-        if(!wasPanning)
-            context.save();
-        //7/25
         $('#slider-vertical').slider({disabled:false});
         
         paused=true;
@@ -257,22 +451,18 @@ var Grapher = function() {
         paused=true;
         draw=clearInterval(draw);
         
-        //I MADE CHANGES 7/24
-        context.clearRect(0,0,c.width,c.height);
-        //7/25
-        context.save();
-        $('#slider-vertical').slider({disabled:true,value:1});
-        $('#zoomlabel').html(1);
-        previousZoom = 1;
+        furthestpoint=0;
         translateX = 0;
         translateY = 0;
         totalZoom = 1;
-        //END CHANGES
+        clearFrame();
+        $('#slider-vertical').slider({disabled:true,value:1});
+        $('#zoomlabel').html(1);
         $('#slider').slider('value', 0);
         root.find('.time').html('0');
         
         audio.pause();
-        //audio.currentTime=0;
+        if (isAudio) audio.currentTime=0;
         offsetTime=0;
     }
     
@@ -297,8 +487,6 @@ var Grapher = function() {
         $('.zoomslider').css('height',vidWidth/3);
         
         $('.time').css('margin-top',buttonWidths/2);
-                         
-        
         
         oneFrame(currentI);
     }
@@ -322,10 +510,10 @@ var Grapher = function() {
         offsetTime=time*1000;
         setTime=true;
         
-        context.clearRect(0,0,c.width,c.height);
+        clearFrame();
         oneFrame(time);
         changeSlider(time);
-        audio.currentTime=time;
+        if (isAudio) audio.currentTime=time;
         
         if(!paused){ // if it wasn't paused, keep playing
             paused=true; //it only starts if it was previously paused.
@@ -345,7 +533,6 @@ var Grapher = function() {
         $('.timeControls').css('width','375px');
         $('#slider').css('width','300px');
         $('#slider').css('margin-top','20px');
-        //I MADE CHANGES 7/25
         $('.zoomslider').css('height', '190px');
         $('.time').css('margin-top','20px');
         oneFrame(currentI);
@@ -355,8 +542,6 @@ var Grapher = function() {
         var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
         var windowHeight=$(window).height();
-        //console.log(windowHeight,windowWidth);
-        //$('#errorcheck').html(windowHeight+' ,'+windowWidth);
         var videoDim;
         //fit canvas to window width
         if (windowWidth>(windowHeight+150)) { //take smaller of the two
@@ -365,14 +550,11 @@ var Grapher = function() {
                 videoDim=100;
             }
             var scaleFactor=ymax;
-            //$('#errorcheck').append(' y ' + videoDim);
         }
         else {
             videoDim=windowWidth-125;
             var scaleFactor=xmax;
-            //$('#errorcheck').append(' x');
         }
-        //console.log(windowHeight,windowWidth,videoDim);
         c.height=ymax * videoDim/scaleFactor;
         c.width=xmax * videoDim/scaleFactor;
         yscale=(c.height)/ymax;
@@ -383,14 +565,22 @@ var Grapher = function() {
         else { resetControlSize(); }
     }
     
-    var template="<div class='lecture'>"
+    function zoomPlay(){
+        if (isZoomPlay){
+            isZoomPlay=false; //toggle
+            return;
+        }
+        isZoomPlay=true;
+        console.log("gonna zoomplay!");
+        
+    }
+    
+    var template="<a href='index.html'>index</a><br><div class='lecture'>"
         + "<canvas class='video' style='cursor:crosshair;'></canvas>"
-    //I MADE CHANGES 7/25
         + "<div class='zoomslider' style='display:inline-block;position:absolute;margin-left:10px;'>"
         + "+<div id='slider-vertical' style='height:75%;'></div>-"
         + "<div id='zoomlabel'>1</div>"
         + "</div>"
-    //END CHANGES
         + "<br> <div class='controls'>"
         + "<div class='buttons'>"
         + "<input class='start' type='button'/>"
@@ -413,9 +603,11 @@ var Grapher = function() {
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
+        if (audioSource == '' ) isAudio=false;
         
         $('.buttons').append('<button class="jumpBack"> < 10s </button>');
         $('.buttons').append('<button class="jumpForward"> 10s > </button>');
+        $('.buttons').append('<button class="zoomplay"> zoom </button>');
         
         $('#slider').slider({
             max:100,
@@ -435,7 +627,9 @@ var Grapher = function() {
                     //only call if it was a user-induced change, not program-induced
         });
         
-/*********************I MADE CHANGES 7/25********/
+        $('#slider').append('<div class="tick ui-widget-content"></div>');
+        $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
+        
         $('#slider-vertical').slider({
             disabled: true,
             orientation: 'vertical',
@@ -444,106 +638,28 @@ var Grapher = function() {
             max: 2,
             step: 0.1,
             value: 1,
-            slide: function(event, ui) {
-                wasPanning = true;
-                totalZoom = ui.value;
-                var newZoom = totalZoom/previousZoom;
-                $('#zoomlabel').html(totalZoom);
-                context.clearRect(0,0,c.width,c.height);
-                context.scale(newZoom, newZoom);
-                context.translate((1-newZoom)*c.width/4,(1-newZoom)*c.height/4);
-                translateX += (1-newZoom)*c.width/4;
-                translateY += (1-newZoom)*c.height/4;
-                previousZoom = totalZoom;
-                oneFrame(currentI);
-            }
+            start: zoomStart,
+            slide: zooming
         });
-/*********************END CHANGES****************/
-        
-//        var windowWidth=$(window).width();
-//        var windowHeight=$(window).height();
-//        var videoDim;
-//        //fit canvas to window width
-//        if (windowWidth>(windowHeight+150)) { //take smaller of the two
-//            videoDim=(windowHeight-200);
-//            var scaleFactor=ymax;
-//        }
-//        else {
-//            videoDim=windowWidth-125;
-//            var scaleFactor=xmax;
-//        }
-//        console.log(windowWidth,windowHeight);
-        
         
         c=root.find('.video')[0];
         
         resizeVisuals();
         
-//        c.height=ymax * videoDim/scaleFactor;
-//        c.width=xmax * videoDim/scaleFactor;
         context=c.getContext('2d');
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-/*****************I MADE CHANGES 7/24****************/
-        var isPanning = false,
-            previousX,
-            previousY,
-            pausedBeforePan = false;
-        //begins listening for drag-to-pan
-        c.addEventListener('mousedown', function(e) {
-            isPanning = true;
-            previousX = e.x;
-            previousY = e.y;
-            if(!wasPanning) {
-//                pausedBeforePan = paused;
-                pause();
-            }
-            wasPanning = false;
-        });
-        //translates canvas with mouse drag
-        c.addEventListener('mousemove', function(e) {
-            if(isPanning) {
-                wasPanning = true;
-                context.clearRect(0,0,c.width,c.height);
-                context.translate(e.x-previousX, e.y-previousY);
-                translateX += e.x-previousX;
-                translateY += e.y-previousY;
-                oneFrame(currentI);
-                previousX = e.x;
-                previousY = e.y;
-            }
-        });
-        //stops listening for pan
-        c.addEventListener('mouseup', function(event) {
-            isPanning = false;
-            
-            //I MADE CHANGES 7/24
-            if(!wasPanning) {
-                paused = false;
-                var mx=event.pageX;
-                var my=event.pageY;
-                var offset=root.find('.video').offset(); //array of left and top
-                mx=Math.round((mx-offset.left-translateX)/totalZoom);
-                my=Math.round((my-offset.top-translateY)/totalZoom);
-                console.log(mx, my, translateX, translateY);
-                selectStroke(mx,my);
-            }
-        });
+        c.addEventListener('mousedown', dragStart);
+        c.addEventListener('mousemove', dragging);
+        c.addEventListener('mouseup', dragStop);
         
-        context.save();
-/*********************END CHANGES***************/
-        
-//        if (c.width<575) {
-//            resizeControls(c.width);
-//        }
-        
-//        yscale=(c.height)/ymax;
-//        xscale=(c.width)/xmax;
         readFile(datafile,getData); //dataPoints now filled with data
         
         root.find('.jumpForward').on('click',jumpForward);
         root.find('.jumpBack').on('click',jumpBack);
+        
+        root.find('.zoomplay').on('click',zoomPlay);
         
         root.find('.pause').on('click',pause);
         root.find('.start').on('click',start);
@@ -555,6 +671,7 @@ var Grapher = function() {
 };
 
 
+//implements everything
 (function() {
     var createGrapher = function() {
         window.grapher = Grapher(jQuery);
@@ -565,7 +682,7 @@ var Grapher = function() {
     var css = document.createElement('link');
     css.setAttribute('rel', 'stylesheet');
     css.setAttribute('type', 'text/css');
-    css.setAttribute('href', 'style.css'); // XXX TODO CHANGEME!!
+    css.setAttribute('href', 'style.css');
     document.head.appendChild(css);
 
     if ('jQuery' in window) {
@@ -591,28 +708,3 @@ var Grapher = function() {
         }, 50);
     }
 })();
-
-
-/*
-TODO:
--resize window, fill up browser size
-    -maintain stroke width
--minimize amount of things you have to put in the actual html
--reorganize data so that you have type of stroke in it
-    (so you can do color, highlight, etc)
-    
-    changes over time
-    color
-    stroke width
-    
-    background slides
-    
-    user interacting drag
-        -have a 'return to default' button
-    
-    each stroke will have its own list of events (events over time)
-    & lecture itself will have a list of events
-    
-CURRENT BUGS:
-
-*/

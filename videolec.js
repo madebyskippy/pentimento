@@ -606,9 +606,10 @@ var Grapher = function() {
         isDragging = true;
         previousX = e.pageX;
         previousY = e.pageY;
-        if(!wasDragging & !freePosition)
+        if(!wasDragging & !freePosition) {
             initialPause=paused;
             pause(); // only pauses the first time
+        }
         wasDragging = false;
     }
     
@@ -765,6 +766,7 @@ var Grapher = function() {
             paused=false;
             setTime=false;
             initialTime=Date.now()-offsetTime;
+            draw=clearInterval(draw);
             draw=setInterval(graphData,50);
             if (isAudio) audio.currentTime=currentI;
             audio.play();
@@ -1231,6 +1233,7 @@ var Grapher = function() {
         
         $('#revertPos').on('click', function () {
             if(!paused & !freePosition) pause();
+            freePosition = false;
             var next = getTransform(currentI);
             animateToPos(Date.now(), 200, next.tx, next.ty, next.m11);
         });
@@ -1265,7 +1268,19 @@ var Grapher = function() {
             }
             if (event.keyCode==102) {
                 freePosition = !freePosition;
-                console.log(freePosition);
+                if(!freePosition) { //animate to playing position if reverting from free
+                    var initialpaused = paused;
+                    if(!paused)
+                        pause();
+                    paused = initialpaused;
+                    var next = getTransform(currentI);
+                    animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function() {
+                        if(!paused) {
+                            paused = true;
+                            start();
+                        }
+                    });
+                }
             }
         });
         

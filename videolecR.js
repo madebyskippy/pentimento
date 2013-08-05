@@ -10,63 +10,213 @@ var Grapher = function() {
     var xmax=1100;
     var yscale;
     var xscale;
-    var previousZoom = 1;
-    var translateX = 0;
+    var translateX = 0; //maybe should keep transform as matrix object?
     var translateY = 0;
     var totalZoom = 1;
+    var previousX, previousY, previousZoom; //stand-in variables for many things
+    var isDragging = false; //true if currently panning/zooming
+    var wasDragging = false; //true if currently paused and panning/zooming
+    var dragToPan = true; //true if dragging to pan, false if dragging to zoom
+    var zoomRectW = 0, zoomRectH = 0;
+    var offset;
+    var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
+    var fullscreenMode = false;
+    var controlsVisible = true;
+    var freePosition = false;
+    
+    //LIMITS ON THINGS
+    var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
+    var maxZoom = 4, minZoom = 1;
     
     var audio;
+    var isAudio=true;
     
-    var lines = new Array();
-    var patterns = [/[numberofPrimitives=][0-9]+/ig, 
-                    /[numberofVertices=][0-9]+/ig, 
-                    /[0-9.]+/ig];
-    var dataPoints = new Array();
-    //array of strokes. one stroke is an array of [x,y,t],[x,y,t],...
+    var furthestpoint=0; // furthest point in seconds
     
     var imax;	// maximum time value
     
-    var initialTime; //initial time of start of video
     var currentI=0; //current index of time (in seconds)
-    var currentTime; //current time, as given by date.now();
-    var offsetTime=0; //for use with pause
-    var paused=true;
-    var setTime=false; //true if time was set by slider or strokeFinding
-    var wasPanning = false; //true if currently panning/zooming
+    var initialPause; //used in dragging 
+        //(dragging pauses but unpauses if it was just a click)
     var draw;
     
     var numStrokes=0;
     var dataArray;
     
-    /*
-        how the json is organized:
-        array of stroke objects
-        stroke: {
-            verticies: [ {"x": 0, "y": 0, "t": 0, "pressure":0}, {} ...],
-            properties: [ {"type": "", "time": 0, "thickness":0, "color":0..., "colorfill": 0...}, {} ...]
-        }
-        length: 0 (length of total lecture in seconds)
-        height: 0
-        width: 0 (both of the lecture screen)
+    /***********the dataArray object****************
+        durationInSeconds: number
+        height: number
+        width: number
+        cameraTransforms: [ { m11: number,
+                              m12: number,
+                              m21: number,
+                              m22: number,
+                              time: number,
+                              tx: number,
+                              ty: number,
+                            }, {} ...]
+        pageFlips: [ { page: number,
+                       time: number
+                     }, {} ...]
+        visuals: [ { doesItGetDeleted: boolean,
+                     tDeletion: number,
+                     tEndEdit: number,
+                     tMin: number,
+                     type: string ( "stroke" )
+                     properties: [ { alpha: number,
+                                     alphaFill: number, 
+                                     blue: number, 
+                                     blueFill: number, 
+                                     green: number, 
+                                     greenFill: number, 
+                                     red: number, 
+                                     redFill: number, 
+                                     thickness: number, 
+                                     time: number, 
+                                     type: string ( "basicProperty" )
+                                    }, {}...]
+                     verticies: [ {x: number, y: number, t: number, pressure: number}, {}...]
+                   }, {} ...]
     */
+    
+    function preProcess(json) {
+        //get bounding box
+        boundingRect.xmax = json.width;
+        boundingRect.ymax = json.height;
+//        var totalReduction = 0;
+        for(k in json.visuals) {
+            var stroke = json.visuals[k].vertices;
+            for(j in stroke) {
+                var point = stroke[j];
+                point.y = json.height-point.y;
+                if(point.x < boundingRect.xmin) boundingRect.xmin = point.x;
+                if(point.x > boundingRect.xmax) boundingRect.xmax = point.x;
+                if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
+                if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
+            }
+            
+//            var orig = stroke.length;
+//            //simplify strokes
+//            var j=0;
+//            var step=5;
+//            while(j<stroke.length-step) {
+//                var sumDist = 0;
+//                var a = stroke[j];
+//                var c = stroke[j+step];
+//                var bx = c.x-a.x;
+//                var by = c.y-a.y;
+//                for(var i=j+1; i<j+step; i++) {
+//                    var b = stroke[i];
+//                    var ax = b.x-a.x;
+//                    var ay = b.y-a.y;
+//                    var dot = (ax*bx+ay*by)/(bx*bx+by*by);
+//                    var cx = ax-dot*bx;
+//                    var cy = ay-dot*by;
+//                    sumDist += Math.sqrt(cx*cx+cy*cy);
+//                }
+//                if(sumDist < 0.2) {
+//                    stroke.splice(j+1,step);
+//                    j--;
+//                }
+//                j++;
+//            }
+//            totalReduction += orig-stroke.length;
+        }
+//        console.log(totalReduction);
+//        //divide into similar-direction polygons
+//        var totnews = 0;
+//        for(var i=0; i<json.visuals.length; i++) {
+//            var visual = json.visuals[i],
+//                stroke = visual.vertices,
+//                newStrokes = [];
+//            //find all breaking points
+//            var cosb;
+//            var j=10;
+//            
+//            while(j<stroke.length-10) {
+//                var point = stroke[j],
+//                    next = stroke[j+1];
+//                var ab = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x), parseInt(next.y)),
+//                    bc = getDistance(parseInt(next.x), parseInt(next.y), parseInt(next.x+1), parseInt(next.y+1)),
+//                    ac = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x+1), parseInt(next.y+1));
+//                if(ab !== 0 & bc !== 0) {
+//                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
+//                    newcosb = parseInt(newcosb*1000)/1000;
+//                    if(Math.abs(newcosb) !== 0.316 & Math.abs(newcosb) !== 0.707 & !isNaN(newcosb)) {
+//                        if(cosb !== undefined & newcosb/cosb < 0) {
+//                            newStrokes.push(j);
+//                            totnews++;
+//                        }
+//                        cosb = newcosb;
+//                    }
+//                }
+//                j++;
+//            }
+//            if(newStrokes.length !== 0) {
+//                newStrokes.push(stroke.length-1);
+//                //at each breaking point, create new stroke
+//                for(var k=0; k<newStrokes.length-1; k++) {
+//                    var begin = newStrokes[k];
+//                    var end = newStrokes[k+1];
+//                    var newVertices = [];
+//                    var newVisual;
+//                    for(var h=begin; h<=end; h++)
+//                        newVertices.push(jQuery.extend(true,{},stroke[h]));
+//                    newVisual = jQuery.extend(true,{},visual);
+//                    newVisual.vertices = newVertices;
+//                    json.visuals.push(newVisual);
+//                }
+//                stroke = stroke.slice(0,newStrokes[0]+1);
+//            }
+//        }
+//        console.log(totnews);
+        //invert y transforms
+        for(i in json.cameraTransforms) {
+            var transform = json.cameraTransforms[i];
+            transform.ty = -transform.ty;
+            if(transform.m11 > maxZoom) maxZoom = transform.m11;
+            if(transform.m11 < minZoom) minZoom = transform.m11;
+            if(-transform.tx < boundingRect.xmin) boundingRect.xmin = -transform.tx;
+            if(-transform.tx > boundingRect.xmax - json.width) boundingRect.xmax = json.width-transform.tx;
+            if(-transform.ty < boundingRect.ymin) boundingRect.ymin = -transform.ty;
+            if(-transform.ty > boundingRect.ymax - json.height) boundingRect.ymax = json.height-transform.ty;
+        }
+        boundingRect.width = boundingRect.xmax - boundingRect.xmin;
+        boundingRect.height = boundingRect.ymax - boundingRect.ymin;
+        minZoom = Math.min(json.width/boundingRect.width,json.height/boundingRect.height);
+        $('#zoomslider').slider({min: minZoom});
+        resizeVisuals();
+        numStrokes=json.visuals.length;
+        
+        return json;
+    }
     
     // updates lines and dataPoints with new file
     function getData(file) {
         console.log(JSON.parse(file.responseText));
         dataArray = JSON.parse(file.responseText);
-        //REPLACE dataPoints WITH dataArray!!!!!!!!!!!!!!!
-        console.log(dataArray.strokes[0]);
-        imax = dataArray.strokes.length;
-        console.log("imax: "+imax);
-        $('#slider').slider("option","max",imax);
-        slider.max=imax;
-        numStrokes=dataArray.strokes.length;
+        imax = dataArray.durationInSeconds;
+        xmax=dataArray.width;
+        ymax=dataArray.height;
+        dataArray = preProcess(dataArray);
+        
+        if (localStorage[datafile]!= undefined){
+            var newTransform = getTransform(currentI);
+            totalZoom = newTransform.m11;
+            translateX = newTransform.tx;
+            translateY = newTransform.ty;
+            $('#zoomslider').slider('value', totalZoom);
+            displayZoom(totalZoom);
+            clearFrame();
+            oneFrame(currentI);
+            if (isAudio) audio.currentTime=currentI;
+        }
+
     }
 
 	function readFile(url, callback) {
 		var txtFile = new XMLHttpRequest();
 		txtFile.open("GET", url, true);	
-		//txtFile.setRequestHeader('User-Agent','XMLHTTP/1.0');
 		txtFile.onreadystatechange = function() {
 			if (txtFile.readyState != 4) {return;}  // document is ready to parse.	
 			if (txtFile.status != 200 && txtFile.status != 304) {return;}  // file is found
@@ -80,121 +230,266 @@ var Grapher = function() {
     //called when you click on the canvas
     function selectStroke(x,y){
         x=x/xscale;
-        y=(c.height-y)/yscale;
-        var minDistance=5; //if the point is further than this then ignore it
+        y=y/yscale;
+        var minDistance=10; //if the point is further than this then ignore it
         var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
-        var done=false;
         for(var i=0; i<numStrokes; i++){
-            var currentStroke=dataArray.strokes[i];
-            for(var j=0;j<currentStroke.length; j++){
-                if (currentStroke[j][2]<currentI){
+            var currentStroke=dataArray.visuals[i];
+            for(var j=0;j<currentStroke.vertices.length; j++){
+                var deletedYet=false;
+                if (currentStroke.doesItGetDeleted){
+                    if (currentStroke.tDeletion<furthestpoint) deletedYet=true;
+                }
+                if (currentStroke.vertices[j].t<furthestpoint & !deletedYet){
                     //check closeness of x,y to this current point
-                    var dist = getDistance(x,y,currentStroke[j][0],currentStroke[j][1])
+                    var dist = getDistance(x,y,currentStroke.vertices[j].x,
+                                           currentStroke.vertices[j].y)
                     if (dist<closestPoint.distance){
                         closestPoint.distance=dist;
                         closestPoint.stroke=i;
                         closestPoint.point=j;
-                        closestPoint.time=currentStroke[j][2];
+                        closestPoint.time=currentStroke.vertices[j].t;
                     }
-                }else{
-                    done=true;
-                    break;
                 }
             }
-            if (done) break;
         }
         
         console.log(closestPoint);
         if (closestPoint.stroke!= -1){ //it found a close enough point
-            var time=parseFloat(dataPoints[closestPoint.stroke][0][2]); //TODO: CHANGE TO NEW DATA ARRAY
-            offsetTime=time*1000;
-            setTime=true;
-            context.clearRect(0,0,c.width,c.height);
-            oneFrame(time);
-            changeSlider(time);
-            audio.currentTime=time;
+            var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
+            audio.currentTime = time;
+            
+            if(audio.paused) {
+                var newTransform = getTransform(audio.currentTime);
+                animateToPos(Date.now(), 200, newTransform.tx, newTransform.ty, newTransform.m11, function(){
+                    $('#zoomslider').slider('value', totalZoom);
+                    displayZoom(totalZoom);
+                });
+            }
+            //animate to pos with new transform, put draw-one-frame-stuff in callback function
         }
-        if(!paused){ // if it wasn't paused, keep playing
-            paused=true; //it only starts if it was previously paused.
-            start();
+        if(!initialPause){ // if it wasn't paused, keep playing
+            var next = getTransform(audio.currentTime);
+            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function(){
+                audio.play();
+            });
         }
+    }
+    
+    function drawScrollBars(tx, ty, z) {
+        context.beginPath();
+        context.strokeStyle = 'rgba(0,0,0,0.3)';
+        context.lineCap = 'round';
+        context.lineWidth = 8;
+        scrollBarWidth = xmax/boundingRect.width/z*c.width-20;
+        scrollBarLeft = (-tx-boundingRect.xmin*xscale)/boundingRect.width/xscale/z*c.width+10;
+        context.moveTo(scrollBarLeft, c.height-10);
+        context.lineTo(scrollBarLeft+scrollBarWidth, c.height-10);
+        scrollBarHeight = ymax/boundingRect.height/z*c.height-20;
+        scrollBarTop = (-ty-boundingRect.ymin*yscale)/boundingRect.height/yscale/z*c.height+10;
+        context.moveTo(c.width-10, scrollBarTop);
+        context.lineTo(c.width-10, scrollBarTop+scrollBarHeight);
+        context.stroke();
+    }
+    
+    function clearFrame() {
+        // Use the identity matrix while clearing the canvas
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, c.width, c.height);
+        
+        translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale);
+        translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
+        totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
+        
+        if(audio.paused & totalZoom !== minZoom) {
+            drawScrollBars(translateX, translateY, totalZoom);
+        }
+        
+        // Restore the transform
+        context.setTransform(totalZoom,0,0,totalZoom,
+                             translateX,translateY);
     }
     
     function getDistance(x1,y1,x2,y2){
         return Math.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
     }
     
+    function getTransform(time) {
+        if(!freePosition) {
+            var newTransform = {};
+            
+            if (dataArray != undefined) {
+                var cameraChanges = dataArray.cameraTransforms;
+                var nextTransform = cameraChanges[cameraChanges.length-1];
+                var previousTransform = cameraChanges[0];
+                for(var i=0; i< cameraChanges.length; i++){
+                    var currentTransform = cameraChanges[i];
+                    if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
+                        previousTransform = currentTransform;
+                    }
+                    if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
+                        nextTransform = currentTransform;
+                    }
+                }
+                newTransform = jQuery.extend(true,{},previousTransform);
+                if (nextTransform.time !== previousTransform.time) {
+                    var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
+                    newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
+                    newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
+                    newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
+                }
+                newTransform.tx = newTransform.tx/newTransform.m11*xscale;
+                newTransform.ty = newTransform.ty/newTransform.m11*yscale;
+            }
+            
+            return newTransform;
+        }
+        else
+            return {tx: translateX, ty: translateY, m11: totalZoom};
+    }
+    
     function graphData(){
-		context.clearRect(0,0,c.width,c.height);
-		currentTime=Date.now(); //gets current time
-		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
-		changeSlider(currentI);
+        currentI = audio.currentTime;
+        if (currentI > furthestpoint){
+            furthestpoint=currentI;
+        }
+        
+        var local = { 'currentTime': parseFloat(currentI), 
+                     'furthestPoint': parseFloat(furthestpoint)};
+        
+        localStorage[datafile]=JSON.stringify(local);
+        
+        var newTransform = getTransform(currentI);
+        totalZoom = newTransform.m11;
+        translateX = newTransform.tx;
+        translateY = newTransform.ty;
+        $('#zoomslider').slider('value', totalZoom);
+        displayZoom(totalZoom);
+        clearFrame();
         oneFrame(currentI);
-        if (currentI>imax) stop();
 	}
     
-/*************I MADE CHANGES 7/24*****************/    
-    //draw a parallelogram for each pair of points
-    function calligraphize(context, x, y) {
-        var penWidth = 4*xscale;
-        context.lineTo(x-penWidth,y+penWidth);
-        context.lineTo(x,y);
-        context.closePath();
-        context.moveTo(x,y);
-        context.lineTo(x-penWidth,y+penWidth);
+    //draw polygon for each stroke
+    //TODO: break stroke into portions
+    function calligraphize(startIndex, path) {
+        context.beginPath();
+        var point = path[startIndex];
+        var endIndex = path.length-1;
+        context.moveTo(point[0],point[1]);
+        for(var i=startIndex+1; i<path.length-1; i++) {
+            point = path[i];
+            context.lineTo(point[0]+point[2],point[1]-point[2]);
+        }
+        for(var i=endIndex; i>=startIndex; i--) {
+            point = path[i];
+            context.lineTo(point[0]-point[2],point[1]+point[2]);
+        }
+        context.lineTo(point[0],point[1]);
+        context.stroke();
+        context.fill();
     }
     
-    //CHANGE TO WORK WITH NEW DATA!!!!
+    //displays one frame
     function oneFrame(current){
-        var done=false;
-        for(var i=0; i<numStrokes; i++){
-			//var data = dataPoints[i];
-            var data = dataArray.strokes[i].vertices;
-			context.beginPath();
-            context.lineWidth = xscale/8;
-//			context.moveTo((data[0][0]*xscale),ymax*yscale-data[0][1]*yscale);
-			
-			for (var j = 0; j < data.length; j++) {
-				if (data[j].t < current){
-					var x=data[j].x*xscale
-					var y=data[j].y*yscale	
-//					context.lineTo(x,ymax*yscale-y);
-                    calligraphize(context,x,ymax*yscale-y);
-				}else {
-                    done=true;
-					break;}
-			}
-            context.fill();
-            context.stroke();
-            if (done) break;
+        
+        var actualfurthest = furthestpoint;
+        if(furthestpoint < current)
+            furthestpoint = current;
+        
+        for(var i=0; i<numStrokes; i++){ //for all strokes
+            var currentStroke = dataArray.visuals[i];
+            var tmin = currentStroke.tMin;
+            var deleted=false;
+            
+            if(tmin < furthestpoint){
+                var data = currentStroke.vertices;
+             
+                var path = [];
+                var graypath = [];
+                
+                //process the properties
+                var properties= currentStroke.properties;
+                for(var k=0; k< properties.length; k++){ //for all properties of the stroke
+                    var property=properties[k];
+                    if (property.time < furthestpoint) { //if property is to be shown
+                        var fadeIndex = 1;
+                        if(property.type === "fadingProperty") { //calculate fade rate
+                            var timeBeginFade = currentStroke.tDeletion+
+                                property.timeBeginFade;
+                            var fadeDuration = property.durationOfFade;
+                            fadeIndex -= (current-timeBeginFade)/fadeDuration;
+                            if(fadeIndex < 0)
+                                deleted = true;
+                        }
+                        if(property.type === "basicProperty") { //normal property
+                            if(currentStroke.tDeletion < current)
+                                deleted = true;
+                        }
+                        
+                        if(!deleted || !currentStroke.doesItGetDeleted) { //add properties
+                            var r=parseFloat(property.redFill) * 255;
+                            var g=parseFloat(property.greenFill) * 255;
+                            var b=parseFloat(property.blueFill) * 255;
+                            context.fillStyle="rgba("+r+","+g+
+                                              ","+b+","+(property.alphaFill*fadeIndex)+")";
+                            
+                            r=parseFloat(property.red) * 255;
+                            g=parseFloat(property.green) * 255;
+                            b=parseFloat(property.blue) * 255;
+                            context.strokeStyle="rgba("+r+","+g+
+                                              ","+b+","+(property.alpha*fadeIndex)+")";
+                            
+                            context.lineWidth = property.thickness*xscale/50;
+                            
+                            if(tmin > current) {
+                                context.fillStyle = "rgba(100,100,100,0.1)";
+                                context.strokeStyle = "rgba(50,50,50,0.1)";
+                                if(currentStroke.tDeletion < furthestpoint)
+                                    deleted = true;
+                            }
+                        }
+                    }
+                }
+                
+                //draw the stroke
+                if (!deleted || !currentStroke.doesItGetDeleted){
+                    for (var j = 0; j < data.length; j++) { //for all verticies
+                        var x=data[j].x*xscale;
+                        var y=data[j].y*yscale;
+                        var pressure = data[j].pressure;
+                        if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
+                            path.push([x,y,pressure*context.lineWidth*16]);
+                        }
+                        else if(data[j].t < furthestpoint & data[j].t > current)
+                            graypath.push([x,y,pressure*context.lineWidth*16]);
+                    }
+                    if(path.length > 0)
+                        calligraphize(0, path);
+                    if(graypath.length > 0) {
+                        context.fillStyle = "rgba(100,100,100,0.1)";
+                        context.strokeStyle = "rgba(50,50,50,0.1)";
+                        calligraphize(0, graypath);
+                    }
+                }
+            }
         }
-    }
-/***************END CHANGES*******************/
-    
-    function changeSlider(current){
-        if (current<imax){ 
-            $('#slider').slider('value',current);
-            //current is # of seconds...convert that to minutes & sec
-            var secondsPassed=parseFloat(current);
-            var minutes=Math.floor(secondsPassed/60);
-            var seconds=Math.round((secondsPassed - minutes*60)*10)/10;
-            var zeros='';
-            if (seconds % 1 === 0 ) zeros='.0';
-            root.find('.time').html(minutes+":"+seconds+zeros);
-        }
+        
+        furthestpoint = actualfurthest;
     }
     
     //triggered on every mouse move
     function sliderTime(){
-        var val=$('#slider').slider('value');
-        var pausedTime=val*1000;
-        setTime=true;
-        offsetTime=pausedTime;
+        var val=audio.currentTime;
         currentI=val;
-		context.clearRect(0,0,c.width,c.height);
+        
+        var newTransform = getTransform(currentI);
+        totalZoom = newTransform.m11;
+        translateX = newTransform.tx;
+        translateY = newTransform.ty;
+        $('#zoomslider').slider('value', totalZoom);
+        displayZoom(totalZoom);
+        clearFrame();
         oneFrame(val);
-        changeSlider(val);
-        //audio.currentTime=val;
     }
     
     //triggered after a user stops sliding
@@ -208,99 +503,251 @@ var Grapher = function() {
     
     //triggered when user starts sliding
     function sliderStart(event, ui){
-        var initialpause=paused;
+        var initialPause=paused;
         pause();
-        paused=initialpause;
+        paused=initialPause;
     }
     
-    function start(){
-        if(paused){
-            //I MADE CHANGES 7/24
-            context.restore();
-            //7/25
-            $('#slider-vertical').slider({disabled:true,value:1});
-            $('#zoomlabel').html(1);
-            previousZoom = 1;
-            translateX = 0;
-            translateY = 0;
-            totalZoom = 1;
-            wasPanning = false;
-            
-            paused=false;
-            setTime=false;
-            initialTime=Date.now()-offsetTime;
-            draw=setInterval(graphData,50);
-            audio.play();
-        }
+    //triggered when zoom slider is clicked
+    function zoomStart() {
+        wasDragging = true;
+        previousX = translateX;
+        previousY = translateY;
+        previousZoom = totalZoom;
     }
     
-    function pause(){
-        //I MADE CHANGES 7/24
-        if(!wasPanning)
-            context.save();
-        //7/25
-        $('#slider-vertical').slider({disabled:false});
+    //triggered when zoom slider is changed
+    function zooming(event, ui) {
+        totalZoom = Math.max(minZoom, Math.min(ui.value, maxZoom));
+        displayZoom(totalZoom);
         
-        paused=true;
-        draw=clearInterval(draw);
-        audio.pause();
-        var pausedTime=Date.now();
-        if (!setTime) {
-            if (initialTime==null)
-                offsetTime=0;
-            else
-                offsetTime=pausedTime-initialTime;
-        }
-    }
-    
-    function stop(){
-        paused=true;
-        draw=clearInterval(draw);
-        
-        //I MADE CHANGES 7/24
-        context.clearRect(0,0,c.width,c.height);
-        //7/25
-        context.save();
-        $('#slider-vertical').slider({disabled:true,value:1});
-        $('#zoomlabel').html(1);
-        previousZoom = 1;
-        translateX = 0;
-        translateY = 0;
-        totalZoom = 1;
-        //END CHANGES
-        $('#slider').slider('value', 0);
-        root.find('.time').html('0');
-        
-        audio.pause();
-        //audio.currentTime=0;
-        offsetTime=0;
-    }
-    
-    function resizeControls(vidWidth){
-        
-        $('.controls').css('width', vidWidth);
-        
-        var buttonWidths=parseInt((vidWidth/4-20)/3);
-        $('.buttons').css('width', vidWidth/4);
-        $('.pause').css('width',buttonWidths);
-        $('.start').css('width',buttonWidths);
-        $('.stop').css('width',buttonWidths);
-        $('.pause').css('background-size',buttonWidths);
-        $('.start').css('background-size',buttonWidths);
-        $('.stop').css('background-size',buttonWidths);
-        
-        $('.timeControls').css('width',vidWidth/4*3);
-        
-        $('#slider').css('width',vidWidth/2-10);
-        $('#slider').css('margin-top',buttonWidths/2);
-        //I MADE CHANGES 7/25
-        $('.zoomslider').css('height',vidWidth/3);
-        
-        $('.time').css('margin-top',buttonWidths/2);
-                         
-        
-        
+        //zoom in on center of visible portion achieved by extra translations
+        translateX = previousX + (1-totalZoom/previousZoom)*(c.width/2-previousX);
+        translateY = previousY + (1-totalZoom/previousZoom)*(c.height/2-previousY);
+        clearFrame();
         oneFrame(currentI);
+    }
+    
+    function displayZoom(totalZoom){
+        setTimeout(function(){
+            $('#zoomlabel').html(parseInt(totalZoom*10)/10).position({
+                my: 'left center',
+                at: 'right center',
+                of: $('#zoomslider .ui-slider-handle'),
+                offset: '0,10'
+            });
+            $('#zoomlabel').css('padding-left','5px');
+        },5);
+    }
+    
+    function pan(dx, dy) {
+        translateX += dx;
+        translateY += dy;
+        clearFrame();
+        oneFrame(currentI);
+    }
+    
+    //triggered when mouse pressed on canvas
+    function dragStart(e) {
+        isDragging = true;
+        previousX = e.pageX;
+        previousY = e.pageY;
+        if(!wasDragging & !freePosition) {
+            initialPause=audio.paused;
+            audio.pause(); // only pauses the first time
+        }
+        wasDragging = false;
+    }
+    
+    //triggered when mouse dragged across canvas
+    function dragging(e) {
+        var x = e.pageX,
+            y = e.pageY;
+        if(isDragging) {
+            wasDragging = true;
+            if(dragToPan) {
+                var newTx = (x-previousX);
+                var newTy = (y-previousY);
+                pan(newTx, newTy);
+                previousX = x;
+                previousY = y;
+            }
+            else {
+                zoomRectW = Math.max(offset.left, Math.min(x, offset.left+c.width))-previousX;
+                zoomRectH = Math.max(offset.top, Math.min(y, offset.top+c.height))-previousY;
+                if(zoomRectW/zoomRectH > c.width/c.height) //maintains aspect ratio of zoom region
+                    zoomRectH = c.height/c.width*zoomRectW;
+                else
+                    zoomRectW = c.width/c.height*zoomRectH;
+                clearFrame();
+                oneFrame(currentI);
+                if(c.width/Math.abs(zoomRectW/totalZoom) < maxZoom)
+                    context.fillStyle = 'rgba(0,255,0,0.1)';
+                else
+                    context.fillStyle = 'rgba(255,0,0,0.1)';
+                context.fillRect((previousX-offset.left-translateX)/totalZoom,
+                                 (previousY-offset.top-translateY)/totalZoom,
+                                 zoomRectW/totalZoom, zoomRectH/totalZoom);
+            }
+        }
+        
+        //CHANGE THIS - for mouse move to show stuff in fullscreenmode
+        if(fullscreenMode) {
+            //NOT VISIBLE AND MOUSED OVER - SHOW
+            if(!controlsVisible & 
+               ((y > c.height-15 & 
+                 x > offset.left & 
+                 x < offset.left+c.width) | 
+                (x < offset.left+c.width & x > offset.left+c.width-15)))
+                animateControls(true);
+            //VISIBLE AND NOT MOUSED OVER - HIDE
+            if(controlsVisible & 
+               ((y < c.height-$('.audio').outerHeight(true) & 
+                 x < offset.left+c.width-$('.sidecontrols').outerWidth(true)) | 
+                x < offset.left | 
+                x > offset.left+c.width))
+                animateControls(false);
+        }
+    }
+    
+    function animateControls(show) {
+        if(show) {
+            $('.audio').show();
+            $('.audio').animate({opacity: 1},200);
+            $('.sidecontrols').show();
+            $('.sidecontrols').animate({opacity: 1},200);
+            controlsVisible = true;
+        }
+        else {
+            $('.audio').animate({opacity: 0},200);
+            setTimeout(function(){$('.audio').hide();},200);
+            $('.sidecontrols').animate({opacity: 0},200);
+            setTimeout(function(){$('.sidecontrols').hide();},200);
+            controlsVisible = false;
+        }
+    }
+    
+    //triggered when mouse released on canvas
+    function dragStop() {
+        if(isDragging) {
+            isDragging = false;
+            
+            if(!dragToPan & wasDragging) { //zoom in on region
+                var nz = c.width/Math.abs(zoomRectW/totalZoom);
+                if(nz < maxZoom) {
+                    if(zoomRectW < 0)   previousX += zoomRectW; // upper left hand corner
+                    if(zoomRectH < 0)   previousY += zoomRectH;
+                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
+                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
+                    nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
+                    ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
+                    animateToPos(Date.now(), 200, nx, ny, nz);
+                }
+                else {
+                    clearFrame();
+                    oneFrame(currentI);
+                }
+                zoomRectW = 0;
+                zoomRectH = 0;
+            }
+            
+            if(!wasDragging) { // click
+                paused = initialPause;
+                previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
+                previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
+                selectStroke(previousX,previousY);
+            }
+        }
+    }
+    
+    //animates back to playing position before playing
+    function animateToPos(startTime, duration, nx, ny, nz, callback) {
+        nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
+        ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
+        
+        var interpolatedTime = (Date.now() - startTime)/duration;
+        
+        if(interpolatedTime > 1 | (translateX === nx & translateY === ny & totalZoom === nz)) {
+            translateX = nx, translateY = ny, totalZoom = nz;
+            clearFrame();
+            oneFrame(currentI);
+            $('#zoomslider').slider('value',nz);
+            displayZoom(totalZoom);
+            if(callback !== undefined)
+                callback();
+        }
+        else {
+            // Use the identity matrix while clearing the canvas
+            context.setTransform(1, 0, 0, 1, 0, 0);
+            context.clearRect(0, 0, c.width, c.height);
+            
+            var newZoom = totalZoom + (nz - totalZoom)*interpolatedTime;
+            var newX = translateX + (nx - translateX)*interpolatedTime;
+            var newY = translateY + (ny - translateY)*interpolatedTime;
+            
+            drawScrollBars(newX, newY, newZoom);
+            
+            context.setTransform(newZoom,0,0,newZoom,
+                                 newX,newY);
+            oneFrame(currentI);
+            
+            setTimeout(function() {
+                animateToPos(startTime, duration, nx, ny, nz, callback);
+            }, 10);
+        }
+    }
+    
+    //trigger on audio play
+    function start(){
+        $('#zoomslider').slider({disabled:true});
+        wasDragging = false;
+        root.find('.start').css('background-image',
+            "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
+        $('#slider .ui-slider-handle').css('background','#0b0');
+        root.find('.video').css('border','1px solid #eee');
+        $('.onScreenStatus').css('visibility',"hidden");
+        
+        draw=clearInterval(draw);
+        draw=setInterval(graphData,50);
+    }
+    
+    //trigger on audio pause
+    function pause(){
+        $('#zoomslider').slider({disabled:false});
+        root.find('.start').css('background-image',
+            "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+        $('#slider .ui-slider-handle').css('background','#f55');
+        root.find('.video').css('border','1px solid #f88');
+        
+        $('.onScreenStatus').css('visibility',"visible");
+        fadePauseSign();
+        
+        draw=clearInterval(draw);
+    }
+    
+    //trigger on audio ended
+    function stop(){
+        draw=clearInterval(draw);
+        
+        localStorage[datafile]=undefined;//JSON.stringify(local);
+        
+        root.find('.start').css('background-image',
+            "url('http://web.mit.edu/lilis/www/videolec/play.png')");
+        $('#slider .ui-slider-handle').css('background','#f55');
+        root.find('.video').css('border','1px solid #f88');
+        
+        furthestpoint=0;
+        
+        oneFrame(imax);
+    }
+    
+    function fadePauseSign(){
+        $('.onScreenStatus').animate({
+            opacity: 0
+        },1000,function(){
+            $('.onScreenStatus').css('visibility',"hidden");
+            $('.onScreenStatus').css('opacity',".5");
+        });
     }
     
     function jumpForward(){
@@ -312,51 +759,35 @@ var Grapher = function() {
     }
     
     function jump(val){
-        var initialpause=paused;
-        pause();
-        paused=initialpause;
-        var time=currentI+val;
-        if (time > imax) time = parseInt(imax);
-        if (time < 0) time=0;
-        currentI=time;
-        offsetTime=time*1000;
-        setTime=true;
+        audio.currentTime += val;
+        currentI = audio.currentTime;
+            
+        var newTransform = getTransform(currentI);
+        totalZoom = newTransform.m11;
+        translateX = newTransform.tx;
+        translateY = newTransform.ty;
+        $('#zoomslider').slider('value', totalZoom);
+        displayZoom(totalZoom);
         
-        context.clearRect(0,0,c.width,c.height);
-        oneFrame(time);
-        changeSlider(time);
-        audio.currentTime=time;
-        
-        if(!paused){ // if it wasn't paused, keep playing
-            paused=true; //it only starts if it was previously paused.
-            start();
-        }
+        clearFrame();
+        oneFrame(currentI);
     }
     
-    function resetControlSize(){
-        $('.controls').css('width', '575px');
-        $('.buttons').css('width', '175px');
-        $('.pause').css('width','50px');
-        $('.start').css('width','50px');
-        $('.stop').css('width','50px');
-        $('.pause').css('background-size','50px');
-        $('.start').css('background-size','50px');
-        $('.stop').css('background-size','50px');
-        $('.timeControls').css('width','375px');
-        $('#slider').css('width','300px');
-        $('#slider').css('margin-top','20px');
-        //I MADE CHANGES 7/25
-        $('.zoomslider').css('height', '190px');
-        $('.time').css('margin-top','20px');
-        oneFrame(currentI);
+    function resizeControls(vidWidth){
+        $('.audio').css("width", (vidWidth+'px'));
+        
+        $('.sidecontrols').css('height',2*vidWidth/3);
+        $('#zoomslider').css('height','100%');
+        displayZoom(totalZoom);
+        
+        clearFrame();
+        oneFrame(audio.currentTime);
     }
     
     function resizeVisuals(){
         var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
         var windowHeight=$(window).height();
-        //console.log(windowHeight,windowWidth);
-        //$('#errorcheck').html(windowHeight+' ,'+windowWidth);
         var videoDim;
         //fit canvas to window width
         if (windowWidth>(windowHeight+150)) { //take smaller of the two
@@ -365,196 +796,348 @@ var Grapher = function() {
                 videoDim=100;
             }
             var scaleFactor=ymax;
-            //$('#errorcheck').append(' y ' + videoDim);
         }
         else {
             videoDim=windowWidth-125;
             var scaleFactor=xmax;
-            //$('#errorcheck').append(' x');
         }
-        //console.log(windowHeight,windowWidth,videoDim);
-        c.height=ymax * videoDim/scaleFactor;
-        c.width=xmax * videoDim/scaleFactor;
+        
+        if(fullscreenMode) {
+            $('body').css('padding', 0);
+            $('body').find('.menulink').hide();
+            c.height = windowHeight;
+            c.width = xmax/ymax*c.height;
+            if(c.width > windowWidth) {
+                c.width = windowWidth;
+                c.height = ymax/xmax*c.width;
+            }
+            $('.lecture').css({height: c.height,
+                               width: c.width,
+                               margin: 'auto auto'});
+            $('.audio').css({position: 'absolute',
+                             top: ((c.height-$('.audio').outerHeight(true))+'px'),
+                             left: $('.video').offset().left});
+            $('.sidecontrols').css({position: 'absolute',
+                                    top: 0,
+                                    left: (($('.video').offset().left+
+                                            $('.video').width()-
+                                            $('.sidecontrols').outerWidth(true))+'px'),
+                                    'background-color':'rgba(235,235,235,0.9)'});
+        }
+        else {
+            $('body').css('padding', '50px');
+            $('body').find('.menulink').show();
+            c.height=ymax * videoDim/scaleFactor;
+            c.width=xmax * videoDim/scaleFactor;
+            $('.lecture').css({height: 'auto',
+                               width: 'auto'});
+            $('.sidecontrols').css({position: 'absolute',
+                                    top: ($('.video').offset().top+'px'),
+                                    left: (($('.video').offset().left+
+                                            $('.video').width()+10)+'px'),
+                                    'background-color':'none'});
+        }
+        
         yscale=(c.height)/ymax;
         xscale=(c.width)/xmax;
-        if (c.width<575) {
-            resizeControls(c.width);
+        offset = root.find('.video').offset();
+        resizeControls(c.width);
+        
+        var onScreenStatusWidth=c.width * 80/575;
+        $('.onScreenStatus').css('margin-top', -c.height/2-onScreenStatusWidth/2);
+        $('.onScreenStatus').css('margin-left',c.width/2-onScreenStatusWidth/2);
+        $('#pauseIcon').css('width',onScreenStatusWidth+"px");
+        $('#pauseIcon').css('height',onScreenStatusWidth+"px");
+        $('.onScreenStatus').css('opacity',".5");
+        if (audio.paused && audio.currentTime != 0){ //paused but has been started at some point
+            $('.onScreenStatus').css('visibility',"visible");
+        }else {
+            $('.onScreenStatus').css('visibility',"hidden");
         }
-        else { resetControlSize(); }
     }
     
-    var template="<div class='lecture'>"
-        + "<canvas class='video' style='cursor:crosshair;'></canvas>"
-    //I MADE CHANGES 7/25
-        + "<div class='zoomslider' style='display:inline-block;position:absolute;margin-left:10px;'>"
-        + "+<div id='slider-vertical' style='height:75%;'></div>-"
-        + "<div id='zoomlabel'>1</div>"
+    //custom handler to distinguish between single- and double-click events
+    function doubleClickHandler(input) {
+        var element = input.element;
+        var down = input.down;
+        var move = input.move;
+        var up = input.up;
+        var double = input.double;
+        var touch = input.touch;
+        var tolerance = input.tolerance;
+        var doubled = false;
+        function onTouch() {
+            element.on('touchend', listenTouch);
+            element.on('touchstart', function(e) {
+                down(e.originalEvent.touches[0]);
+            });
+            element.on('touchmove', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                move(e.originalEvent.touches[0]);
+            });
+        }
+        function onClick() {
+            element.on('mouseup', listenClick);
+            element.on('mousedown', down);
+            element.on('mousemove', move);
+        }
+        function listenTouch(e) {
+            element.off('touchend touchstart touchmove');
+            doubled = false;
+            var click = setTimeout(function() {
+                if(!doubled)
+                    up();
+                doubled = false;
+                element.off('touchend');
+                onTouch();
+            },tolerance);
+            element.on('touchend', function() {
+                clearTimeout(click);
+                double(e);
+                doubled = true;
+                element.off('touchend');
+                onTouch();
+            });
+        }
+        function listenClick(e) {
+            element.off('mouseup mousedown mousemove');
+            doubled = false;
+            var click = setTimeout(function() {
+                if(!doubled)
+                    up();
+                doubled = false;
+                element.off('mouseup');
+                onClick();
+            },tolerance);
+            element.on('mouseup', function() {
+                clearTimeout(click);
+                double(e);
+                doubled = true;
+                element.off('mouseup');
+                onClick();
+            });
+        }
+        if(!touch) onClick();
+        else onTouch();
+        
+        var exports = {
+            off: function() {
+                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
+            },
+            toggle: function() {
+                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
+                touch = !touch;
+                if(!touch) onClick();
+                else onTouch();
+            }
+        };
+        
+        return exports;
+    }
+    
+    var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
+        + "<canvas class='video'></canvas>"
+        + "<div class='onScreenStatus'> <img src='http://web.mit.edu/lilis/www/videolec/pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
+        + "<div class='sidecontrols'>"
+        + " <div class='zoomControls'><span class='zoomlabel'>+</span>"
+        + "     <div id='zoomslider'></div>"
+        + "     <span class='zoomlabel' style='margin-top: -20px;'>-</span>"
+        + "     <div id='zoomlabel'>1</div> </div>"
+        + " <div class='toggleControls'>"
+        + "     <div class='left'>drag: </div>"
+        + "     <div class='right'>"
+        + "         <div class='labels' id='pan'>pan</div>"
+        + "         <div class='labels' id='zoom'>zoom</div>"
+        + "         <div id='toggleDrag'></div></div>"
+        + " </div>"
         + "</div>"
-    //END CHANGES
-        + "<br> <div class='controls'>"
-        + "<div class='buttons'>"
-        + "<input class='start' type='button'/>"
-        + "<input class='pause' type='button'/>"
-        + "<input class='stop' type='button'/>"
-        + "</div>"
-        + "<div class='timeControls'>"
-        + "<div id='slider'></div>"
-        + "<div class='time'>0</div>"
-        + "</div>"
-        + "<audio class='audio' preload='auto'>"
+        + "<br> <audio controls class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "</audio>"
         + "</div>"
         + "</div>";
     exports.initialize = function() {
-        root = $("<div class='pentimento'></div>").appendTo($('body'));
+        root=$('.pentimento');
         root.append(template);
         
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
+        if (audioSource == '' ) isAudio=false;
         
-        $('.buttons').append('<button class="jumpBack"> < 10s </button>');
-        $('.buttons').append('<button class="jumpForward"> 10s > </button>');
-        
-        $('#slider').slider({
-            max:100,
-            min:0,
-            step:.1,
-            range: 'max',
-            stop: sliderStop,
-            start: sliderStart,
-            slide: sliderTime,
-            change: function(event,ui){
-                if (event.originalEvent) {
-                    sliderStart();
-                    sliderTime(event,ui);
-                    sliderStop();
-                    }
-                }
-                    //only call if it was a user-induced change, not program-induced
-        });
-        
-/*********************I MADE CHANGES 7/25********/
-        $('#slider-vertical').slider({
+        $('#zoomslider').slider({
             disabled: true,
             orientation: 'vertical',
             range: 'min',
-            min: 0.5,
-            max: 2,
+            min: minZoom,
+            max: maxZoom,
             step: 0.1,
             value: 1,
-            slide: function(event, ui) {
-                wasPanning = true;
-                totalZoom = ui.value;
-                var newZoom = totalZoom/previousZoom;
-                $('#zoomlabel').html(totalZoom);
-                context.clearRect(0,0,c.width,c.height);
-                context.scale(newZoom, newZoom);
-                context.translate((1-newZoom)*c.width/4,(1-newZoom)*c.height/4);
-                translateX += (1-newZoom)*c.width/4;
-                translateY += (1-newZoom)*c.height/4;
-                previousZoom = totalZoom;
-                oneFrame(currentI);
-            }
+            start: zoomStart,
+            slide: zooming
         });
-/*********************END CHANGES****************/
-        
-//        var windowWidth=$(window).width();
-//        var windowHeight=$(window).height();
-//        var videoDim;
-//        //fit canvas to window width
-//        if (windowWidth>(windowHeight+150)) { //take smaller of the two
-//            videoDim=(windowHeight-200);
-//            var scaleFactor=ymax;
-//        }
-//        else {
-//            videoDim=windowWidth-125;
-//            var scaleFactor=xmax;
-//        }
-//        console.log(windowWidth,windowHeight);
-        
         
         c=root.find('.video')[0];
         
-        resizeVisuals();
-        
-//        c.height=ymax * videoDim/scaleFactor;
-//        c.width=xmax * videoDim/scaleFactor;
         context=c.getContext('2d');
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-/*****************I MADE CHANGES 7/24****************/
-        var isPanning = false,
-            previousX,
-            previousY,
-            pausedBeforePan = false;
-        //begins listening for drag-to-pan
-        c.addEventListener('mousedown', function(e) {
-            isPanning = true;
-            previousX = e.x;
-            previousY = e.y;
-            if(!wasPanning) {
-//                pausedBeforePan = paused;
-                pause();
-            }
-            wasPanning = false;
-        });
-        //translates canvas with mouse drag
-        c.addEventListener('mousemove', function(e) {
-            if(isPanning) {
-                wasPanning = true;
-                context.clearRect(0,0,c.width,c.height);
-                context.translate(e.x-previousX, e.y-previousY);
-                translateX += e.x-previousX;
-                translateY += e.y-previousY;
-                oneFrame(currentI);
-                previousX = e.x;
-                previousY = e.y;
-            }
-        });
-        //stops listening for pan
-        c.addEventListener('mouseup', function(event) {
-            isPanning = false;
-            
-            //I MADE CHANGES 7/24
-            if(!wasPanning) {
-                paused = false;
-                var mx=event.pageX;
-                var my=event.pageY;
-                var offset=root.find('.video').offset(); //array of left and top
-                mx=Math.round((mx-offset.left-translateX)/totalZoom);
-                my=Math.round((my-offset.top-translateY)/totalZoom);
-                console.log(mx, my, translateX, translateY);
-                selectStroke(mx,my);
-            }
+        var doubleClick = doubleClickHandler({
+            element: $(window),
+            down: function(e) {
+                if(e.target === c)
+                    dragStart(e);
+            },
+            move: dragging,
+            up: dragStop,
+            double: function(e) {
+                if(e.target === c) {
+                    isDragging = false;
+                    var zoom = totalZoom===1?2:1;
+                    function animateZoom() {
+                        zoomStart();
+                        zooming('trash', {value: totalZoom<zoom?
+                                          parseInt(totalZoom*10+1)/10:
+                                          parseInt(totalZoom*10-1)/10});
+                        $('#zoomslider').slider('value', totalZoom);
+                        if(totalZoom !== zoom)
+                            setTimeout(animateZoom, 10);
+                    }
+                    animateZoom();
+                }
+            },
+            touch: false,
+            tolerance: 200
         });
         
-        context.save();
-/*********************END CHANGES***************/
+        c.addEventListener('mousewheel', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            if(!wasDragging & !audio.paused & !freePosition)
+                audio.pause();
+            if(!dragToPan) {
+                var scroll = e.wheelDeltaY;
+                if(e.shiftKey)
+                    scroll = e.wheelDeltaX;
+                if(scroll !== 0) {
+                    zoomStart();
+                    zooming('trash', {value: totalZoom+0.1*scroll/Math.abs(scroll)});
+                    $('#zoomslider').slider('value', totalZoom);
+                }
+            }
+            else
+                pan(e.wheelDeltaX, e.wheelDeltaY);
+            wasDragging = true;
+        });
         
-//        if (c.width<575) {
-//            resizeControls(c.width);
-//        }
+        function checkForAudio() {
+            if(audio.readyState === 4 | !isAudio)
+                readFile(datafile,getData);
+            else
+                setTimeout(checkForAudio, 50);
+        }
+        checkForAudio();
         
-//        yscale=(c.height)/ymax;
-//        xscale=(c.width)/xmax;
-        readFile(datafile,getData); //dataPoints now filled with data
+        root.find('#toggleDrag').slider({
+            orientation: 'vertical',
+            min: -1, max: 1, step: 2, value: 1,
+            slide: function(e, ui) {
+                dragToPan = ui.value > 0;
+                //true if dragging to pan
+                if (dragToPan) {
+                    $('.labels#pan').css('color','#000');
+                    $('.labels#zoom').css('color','#aaa');
+                } else{
+                    $('.labels#pan').css('color','#aaa');
+                    $('.labels#zoom').css('color','#000');
+                }
+            }
+        });
         
-        root.find('.jumpForward').on('click',jumpForward);
-        root.find('.jumpBack').on('click',jumpBack);
+        //SHIFT TO TOGGLE SCROLL TO ZOOM
+        window.addEventListener('keydown', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16) {
+                root.find('#toggleDrag').slider({value: -1, disabled: true});
+                dragToPan = false;
+                root.find('.video').css('cursor', '-webkit-zoom-in');
+            }
+        });
+        window.addEventListener('keyup', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16) {
+                root.find('#toggleDrag').slider({value: 1, disabled: false});
+                dragToPan = true;
+                root.find('.video').css('cursor', 'default');
+            }
+        });
         
-        root.find('.pause').on('click',pause);
-        root.find('.start').on('click',start);
-        root.find('.stop').on('click',stop);
+        $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
+        $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
+        $('.sidecontrols').append('<br><button id="fullscreen">Exit FS</button>');
+        $('.sidecontrols').append('<br><button id="touch">Touch</button>');
+        
+        $('.sidecontrols').css('position', 'absolute');
+        
+        $('#revertPos').on('click', function () {
+            if(!paused & !freePosition) pause();
+            freePosition = false;
+            var next = getTransform(currentI);
+            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11);
+        });
+        $('#seeAll').on('click', function() {
+            if(!paused & !freePosition) pause();
+            animateToPos(Date.now(), 200, 0, 0, minZoom);
+        });
+        $('#fullscreen').on('click', function() {
+            fullscreenMode = !fullscreenMode;
+            $(this).html(fullscreenMode?"Exit FS":"Fullscreen");
+            resizeVisuals();
+        });
+        $('#touch').on('click', function() {
+            $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
+            doubleClick.toggle();
+        });
+        
+        $('body').on('keypress',function(event){
+            if (event.keyCode==32){ // space was pressed
+                //trigger button click
+                if(audio.paused)
+                    audio.play();
+                else
+                    audio.pause();
+            }
+            if (event.keyCode==102) {
+                freePosition = !freePosition;
+                if(!freePosition) { //animate to playing position if reverting from free
+                    var initialpaused = audio.paused;
+                    if(!initialpaused)
+                        audio.pause();
+                    var next = getTransform(audio.currentTime);
+                    animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function() {
+                        if(!initialpaused) 
+                            audio.play();
+                    });
+                }
+            }
+        });
+        
+        console.log(localStorage);
         
         $(window).on('resize',resizeVisuals);
+        
+        audio.addEventListener('play', start);
+        audio.addEventListener('pause', pause);
+        audio.addEventListener('ended', stop);
+        audio.addEventListener('seeking', sliderTime);
     }
     return exports;
 };
 
 
+//implements everything
 (function() {
     var createGrapher = function() {
         window.grapher = Grapher(jQuery);
@@ -565,7 +1148,7 @@ var Grapher = function() {
     var css = document.createElement('link');
     css.setAttribute('rel', 'stylesheet');
     css.setAttribute('type', 'text/css');
-    css.setAttribute('href', 'style.css'); // XXX TODO CHANGEME!!
+    css.setAttribute('href', 'style.css');
     document.head.appendChild(css);
 
     if ('jQuery' in window) {
@@ -591,28 +1174,3 @@ var Grapher = function() {
         }, 50);
     }
 })();
-
-
-/*
-TODO:
--resize window, fill up browser size
-    -maintain stroke width
--minimize amount of things you have to put in the actual html
--reorganize data so that you have type of stroke in it
-    (so you can do color, highlight, etc)
-    
-    changes over time
-    color
-    stroke width
-    
-    background slides
-    
-    user interacting drag
-        -have a 'return to default' button
-    
-    each stroke will have its own list of events (events over time)
-    & lecture itself will have a list of events
-    
-CURRENT BUGS:
-
-*/

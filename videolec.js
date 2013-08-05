@@ -35,12 +35,7 @@ var Grapher = function() {
     
     var imax;	// maximum time value
     
-    var initialTime; //initial time of start of video
     var currentI=0; //current index of time (in seconds)
-    var currentTime=0; //current time, as given by date.now();
-    var offsetTime=0; //for use with pause
-    var paused=true;
-    var setTime=false; //true if time was set by slider or strokeFinding
     var initialPause; //used in dragging 
         //(dragging pauses but unpauses if it was just a click)
     var draw;
@@ -265,29 +260,27 @@ var Grapher = function() {
             }
         }
         
-        console.log(closestPoint);
+        console.log(closestPoint, initialPause);
         if (closestPoint.stroke!= -1){ //it found a close enough point
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
-            console.log(time);
-            offsetTime=time*1000;
-            setTime=true;
             currentI = time;
+            audio.currentTime = time;
             
-            if(paused) {
+            if(initialPause) {
                 var newTransform = getTransform(currentI);
-                animateToPos(Date.now(), 200, newTransform.tx, newTransform.ty, newTransform.m11, function(){
+                animateToPos(Date.now(), 200, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
                     $('#zoomslider').slider('value', totalZoom);
                     displayZoom(totalZoom);
                     changeSlider(time);
-                    if (isAudio) audio.currentTime=time;
                 });
             }
             //animate to pos with new transform, put draw-one-frame-stuff in callback function
         }
-        if(!paused){ // if it wasn't paused, keep playing
-            paused=true; //it only starts if it was previously paused.
+        if(!initialPause){ // if it wasn't paused, keep playing
             var next = getTransform(currentI);
-            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, start);
+            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+                audio.play();
+            });
         }
     }
     
@@ -316,7 +309,7 @@ var Grapher = function() {
         translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
-        if(paused & totalZoom !== minZoom) {
+        if(audio.paused & totalZoom !== minZoom) {
             drawScrollBars(translateX, translateY, totalZoom);
         }
         
@@ -364,8 +357,7 @@ var Grapher = function() {
     }
     
     function graphData(){
-		currentTime=Date.now(); //gets current time
-		currentI=(currentTime/1000.0)-(initialTime/1000.0) //converts to seconds passed
+		currentI=audio.currentTime;
 		changeSlider(currentI);
         if (currentI > furthestpoint){
             furthestpoint=currentI;
@@ -384,10 +376,6 @@ var Grapher = function() {
         displayZoom(totalZoom);
         clearFrame();
         oneFrame(currentI);
-        
-        if (currentI>imax) {
-            stop();
-        }
 	}
     
     //draw polygon for each stroke
@@ -528,9 +516,6 @@ var Grapher = function() {
     //triggered on every mouse move
     function sliderTime(){
         var val=$('#slider').slider('value');
-        var pausedTime=val*1000;
-        setTime=true;
-        offsetTime=pausedTime;
         currentI=val;
         
         var newTransform = getTransform(currentI);
@@ -547,18 +532,16 @@ var Grapher = function() {
     
     //triggered after a user stops sliding
     function sliderStop(event, ui){
-        if (paused){ //if it was paused, don't do anything
+        if (initialPause){ //if it was paused, don't do anything
             return;
         }
-        paused=true; //only starts if it was previously paused
-        start();
+        audio.play();
     }
     
     //triggered when user starts sliding
     function sliderStart(event, ui){
-        var initialpause=paused;
-        pause();
-        paused=initialpause;
+        initialPause=audio.paused;
+        audio.pause();
     }
     
     //triggered when zoom slider is clicked
@@ -574,12 +557,13 @@ var Grapher = function() {
         totalZoom = Math.max(minZoom, Math.min(ui.value, maxZoom));
         displayZoom(totalZoom);
         
-        
         //zoom in on center of visible portion achieved by extra translations
         translateX = previousX + (1-totalZoom/previousZoom)*(c.width/2-previousX);
         translateY = previousY + (1-totalZoom/previousZoom)*(c.height/2-previousY);
-        clearFrame();
-        oneFrame(currentI);
+        if(audio.paused) {
+            clearFrame();
+            oneFrame(audio.currentTime);
+        }
     }
     
     function displayZoom(totalZoom){
@@ -597,8 +581,10 @@ var Grapher = function() {
     function pan(dx, dy) {
         translateX += dx;
         translateY += dy;
-        clearFrame();
-        oneFrame(currentI);
+        if(audio.paused) {
+            clearFrame();
+            oneFrame(audio.currentTime);
+        }
     }
     
     //triggered when mouse pressed on canvas
@@ -606,10 +592,8 @@ var Grapher = function() {
         isDragging = true;
         previousX = e.pageX;
         previousY = e.pageY;
-        if(!wasDragging & !freePosition) {
-            initialPause=paused;
-            pause(); // only pauses the first time
-        }
+        if(!audio.paused)
+            freePosition = true;
         wasDragging = false;
     }
     
@@ -633,8 +617,10 @@ var Grapher = function() {
                     zoomRectH = c.height/c.width*zoomRectW;
                 else
                     zoomRectW = c.width/c.height*zoomRectH;
-                clearFrame();
-                oneFrame(currentI);
+                if(audio.paused) {
+                    clearFrame();
+                    oneFrame(audio.currentTime);
+                }
                 if(c.width/Math.abs(zoomRectW/totalZoom) < maxZoom)
                     context.fillStyle = 'rgba(0,255,0,0.1)';
                 else
@@ -691,18 +677,17 @@ var Grapher = function() {
                     var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
                     nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
                     ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
-                    animateToPos(Date.now(), 200, nx, ny, nz);
+                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
                 }
-                else {
+                else if(audio.paused) {
                     clearFrame();
-                    oneFrame(currentI);
+                    oneFrame(audio.currentTime);
                 }
                 zoomRectW = 0;
                 zoomRectH = 0;
             }
             
             if(!wasDragging) { // click
-                paused = initialPause;
                 previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
                 previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
                 selectStroke(previousX,previousY);
@@ -711,65 +696,56 @@ var Grapher = function() {
     }
     
     //animates back to playing position before playing
-    function animateToPos(startTime, duration, nx, ny, nz, callback) {
+    function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback) {
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
         ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
         
         var interpolatedTime = (Date.now() - startTime)/duration;
         
-        if(interpolatedTime > 1 | (translateX === nx & translateY === ny & totalZoom === nz)) {
+        if(interpolatedTime > 1 | (tx === nx & ty === ny & tz === nz)) {
             translateX = nx, translateY = ny, totalZoom = nz;
-            clearFrame();
-            oneFrame(currentI);
+            if(audio.paused) {
+                clearFrame();
+                oneFrame(audio.currentTime);
+            }
             $('#zoomslider').slider('value',nz);
             displayZoom(totalZoom);
             if(callback !== undefined)
                 callback();
         }
         else {
-            // Use the identity matrix while clearing the canvas
-            context.setTransform(1, 0, 0, 1, 0, 0);
-            context.clearRect(0, 0, c.width, c.height);
+            totalZoom = tz + (nz - tz)*interpolatedTime;
+            translateX = tx + (nx - tx)*interpolatedTime;
+            translateY = ty + (ny - ty)*interpolatedTime;
             
-            var newZoom = totalZoom + (nz - totalZoom)*interpolatedTime;
-            var newX = translateX + (nx - translateX)*interpolatedTime;
-            var newY = translateY + (ny - translateY)*interpolatedTime;
-            
-            drawScrollBars(newX, newY, newZoom);
-            
-            context.setTransform(newZoom,0,0,newZoom,
-                                 newX,newY);
-            oneFrame(currentI);
+            if(audio.paused) {
+                drawScrollBars(translateX, translateY, totalZoom);
+                clearFrame();
+                oneFrame(audio.currentTime);
+            }
             
             setTimeout(function() {
-                animateToPos(startTime, duration, nx, ny, nz, callback);
+                animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback);
             }, 10);
         }
     }
     
     function start(){
-        if(paused){
-            $('#zoomslider').slider({disabled:true});
-            wasDragging = false;
-            root.find('.start').css('background-image',
-                "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
-            $('#slider .ui-slider-handle').css('background','#0b0');
-            root.find('.video').css('border','1px solid #eee');
-            
-            $('#pauseIcon').attr("src",
-                'http://web.mit.edu/lilis/www/videolec/play_big.png');
-            $('.onScreenStatus').css('opacity',".5");
-            $('.onScreenStatus').css('visibility',"visible");
-            fadeSign();
-            
-            paused=false;
-            setTime=false;
-            initialTime=Date.now()-offsetTime;
-            draw=clearInterval(draw);
-            draw=setInterval(graphData,50);
-            if (isAudio) audio.currentTime=currentI;
-            audio.play();
-        }
+        $('#zoomslider').slider({disabled:true});
+        wasDragging = false;
+        root.find('.start').css('background-image',
+            "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
+        $('#slider .ui-slider-handle').css('background','#0b0');
+        root.find('.video').css('border','1px solid #eee');
+        
+        $('#pauseIcon').attr("src",
+            'http://web.mit.edu/lilis/www/videolec/play_big.png');
+        $('.onScreenStatus').css('opacity',".5");
+        $('.onScreenStatus').css('visibility',"visible");
+        fadeSign();
+        
+        draw=clearInterval(draw);
+        draw=setInterval(graphData,50);
     }
     
     function pause(){
@@ -779,32 +755,19 @@ var Grapher = function() {
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
         
-        if (!paused){
-            $('#pauseIcon').attr("src",
-                'http://web.mit.edu/lilis/www/videolec/pause_big.png');
-            $('.onScreenStatus').css('opacity',".5");
-            $('.onScreenStatus').css('visibility',"visible");
-            fadeSign();
-        }
+        $('#pauseIcon').attr("src",
+            'http://web.mit.edu/lilis/www/videolec/pause_big.png');
+        $('.onScreenStatus').css('opacity',".5");
+        $('.onScreenStatus').css('visibility',"visible");
+        fadeSign();
         
-        paused=true;
         draw=clearInterval(draw);
-        audio.pause();
-        var pausedTime=Date.now();
-        if (!setTime) {
-            if (initialTime==null)
-                offsetTime=0;
-            else
-                offsetTime=pausedTime-initialTime;
-        }
     }
     
     function stop(){
-        paused=true;
         draw=clearInterval(draw);
         
         localStorage[datafile]=undefined;
-        
         
         root.find('.start').css('background-image',
             "url('http://web.mit.edu/lilis/www/videolec/play.png')");
@@ -814,10 +777,6 @@ var Grapher = function() {
         furthestpoint=0;
         
         oneFrame(imax);
-        
-        audio.pause();
-        if (isAudio) audio.currentTime=0;
-        offsetTime=0;
     }
     
     function fadeSign(){
@@ -828,14 +787,6 @@ var Grapher = function() {
             $('.onScreenStatus').css('visibility',"hidden");
             $('.onScreenStatus').css('opacity',".5");
         });
-    }
-    
-    function jumpForward(){
-        jump(10);
-    }
-    
-    function jumpBack(){
-        jump(-10);
     }
     
     function jump(val){
@@ -967,7 +918,7 @@ var Grapher = function() {
         $('#pauseIcon').css('width',onScreenStatusWidth+"px");
         $('#pauseIcon').css('height',onScreenStatusWidth+"px");
         $('.onScreenStatus').css('opacity',".5");
-        if (paused && currentTime != 0){ //paused but has been started at some point
+        if (audio.paused && audio.currentTime != 0){ //paused but has been started at some point
             $('.onScreenStatus').css('visibility',"visible");
         }else {
             $('.onScreenStatus').css('visibility',"hidden");
@@ -1037,15 +988,13 @@ var Grapher = function() {
         }
         
         function on() {
+            onTouch();
+            onClick();
             element.on('mousedown', function(e) {
                 element.off('touchstart touchmove touchend');
-                onClick();
-                down(e);
             });
             element.on('touchstart', function(e) {
                 element.off('mousedown mousemove mouseup');
-                onTouch();
-                down(e.originalEvent.touches[0]);
             });
         }
         
@@ -1187,8 +1136,7 @@ var Grapher = function() {
         c.addEventListener('mousewheel', function(e){
             e.preventDefault();
             e.stopPropagation();
-            if(!wasDragging & !paused & !freePosition)
-                pause();
+            freePosition = true;
             if(!dragToPan) {
                 var scroll = e.wheelDeltaY;
                 if(e.shiftKey)
@@ -1212,8 +1160,12 @@ var Grapher = function() {
         }
         checkForAudio();
         
-        root.find('.jumpForward').on('click',jumpForward);
-        root.find('.jumpBack').on('click',jumpBack);
+        root.find('.jumpForward').on('click', function() {
+            audio.playbackRate += 0.1;
+        });
+        root.find('.jumpBack').on('click', function() {
+            audio.playbackRate -= 0.1;
+        });
         root.find('#toggleDrag').slider({
             orientation: 'vertical',
             min: -1, max: 1, step: 2, value: 1,
@@ -1255,14 +1207,16 @@ var Grapher = function() {
         $('.sidecontrols').css('position', 'absolute');
         
         $('#revertPos').on('click', function () {
-            if(!paused & !freePosition) pause();
             freePosition = false;
-            var next = getTransform(currentI);
-            animateToPos(Date.now(), 200, next.tx, next.ty, next.m11);
+            var next = getTransform(audio.currentTime+0.5);
+            freePosition = true;
+            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+                freePosition = false;
+            });
         });
         $('#seeAll').on('click', function() {
-            if(!paused & !freePosition) pause();
-            animateToPos(Date.now(), 200, 0, 0, minZoom);
+            freePosition = true;
+            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, 0, 0, minZoom);
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
@@ -1277,14 +1231,20 @@ var Grapher = function() {
             $(this).html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
             resizeVisuals();
         });
+        
+        audio.addEventListener('play', start);
+        audio.addEventListener('pause', pause);
+        audio.addEventListener('ended', stop);
                 
         root.find('.start').on('click',function() {
-            if(paused) {
-                var next = getTransform(currentI);
-                animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, start);
+            if(audio.paused) {
+                var next = getTransform(audio.currentTime);
+                animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+                    audio.play();
+                });
             }
             else {
-                pause();
+                audio.pause();
             }
         });
         
@@ -1296,17 +1256,8 @@ var Grapher = function() {
             if (event.keyCode==102) {
                 freePosition = !freePosition;
                 if(!freePosition) { //animate to playing position if reverting from free
-                    var initialpaused = paused;
-                    if(!paused)
-                        pause();
-                    paused = initialpaused;
-                    var next = getTransform(currentI);
-                    animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function() {
-                        if(!paused) {
-                            paused = true;
-                            start();
-                        }
-                    });
+                    var next = getTransform(audio.currentTime);
+                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11);
                 }
             }
         });
@@ -1317,11 +1268,9 @@ var Grapher = function() {
             var local=JSON.parse(localStorage[datafile]);
             currentI=local.currentTime;
             furthestpoint=local.furthestPoint;
-            offsetTime=currentI*1000;
         }
         if (t != -100) {
             currentI=t;
-            offsetTime=currentI*1000;
         }
         
         $(window).on('resize',resizeVisuals);

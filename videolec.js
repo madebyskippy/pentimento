@@ -1052,6 +1052,19 @@ var Grapher = function() {
         return exports;
     }
     
+    function getURLParameter(name,data) {
+        return decodeURI(
+            (RegExp('[?|&]'+name + '=' + '(.+?)(&|$)').exec(data)||[,null])[1]
+        );
+    }
+    
+    function urlExists(url){
+        var http=new XMLHttpRequest();
+        http.open('HEAD',url,false);
+        http.send();
+        return http.status!=404;
+    }
+    
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='http://web.mit.edu/lilis/www/videolec/pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
@@ -1085,10 +1098,22 @@ var Grapher = function() {
         root=$('.pentimento');
         root.append(template);
         
+        var filename=getURLParameter('n',location.search);
+        var t=getURLParameter('t',location.search);
+        var end=getURLParameter('end',location.search);
+        console.log(filename,t,end);
+        
+        datafile=filename+".lec";
+        audioSource=filename+".mp3";
+        
+        if (!urlExists(audioSource)) {
+            audioSource='';
+            isAudio=false;
+        }
+        
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
-        if (audioSource == '' ) isAudio=false;
         
         $('.buttons').append('<button class="jumpBack"> < </button>');
         $('.buttons').append('<button class="jumpForward"> > </button>');

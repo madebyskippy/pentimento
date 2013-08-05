@@ -257,6 +257,14 @@ var Grapher = function() {
         console.log(closestPoint);
         if (closestPoint.stroke!= -1){ //it found a close enough point
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
+<<<<<<< HEAD
+            offsetTime=time*1000;
+            setTime=true;
+            clearFrame();
+            oneFrame(time);
+            changeSlider(time);
+            if (isAudio) audio.currentTime=time;
+=======
             audio.currentTime = time;
             
             if(audio.paused) {
@@ -267,6 +275,7 @@ var Grapher = function() {
                 });
             }
             //animate to pos with new transform, put draw-one-frame-stuff in callback function
+>>>>>>> b1d98204954e384e1f5018d5d06e86713ef1bd87
         }
         if(!initialPause){ // if it wasn't paused, keep playing
             var next = getTransform(audio.currentTime);
@@ -481,7 +490,6 @@ var Grapher = function() {
     function sliderTime(){
         var val=audio.currentTime;
         currentI=val;
-        
         var newTransform = getTransform(currentI);
         totalZoom = newTransform.m11;
         translateX = newTransform.tx;
@@ -839,7 +847,6 @@ var Grapher = function() {
             $('.onScreenStatus').css('visibility',"hidden");
         }
     }
-    
     //custom handler to distinguish between single- and double-click events
     function doubleClickHandler(input) {
         var element = input.element;

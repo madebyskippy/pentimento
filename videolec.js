@@ -20,6 +20,9 @@ var Grapher = function() {
     var zoomRectW = 0, zoomRectH = 0;
     var offset;
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
+    var fullscreenMode = true;
+    var controlsVisible = true;
+    var freePosition = false;
     
     //LIMITS ON THINGS
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
@@ -246,9 +249,9 @@ var Grapher = function() {
             for(var j=0;j<currentStroke.vertices.length; j++){
                 var deletedYet=false;
                 if (currentStroke.doesItGetDeleted){
-                    if (currentStroke.tDeletion<currentI) deletedYet=true;
+                    if (currentStroke.tDeletion<furthestpoint) deletedYet=true;
                 }
-                if (currentStroke.vertices[j].t<currentI & !deletedYet){
+                if (currentStroke.vertices[j].t<furthestpoint & !deletedYet){
                     //check closeness of x,y to this current point
                     var dist = getDistance(x,y,currentStroke.vertices[j].x,
                                            currentStroke.vertices[j].y)
@@ -327,33 +330,37 @@ var Grapher = function() {
     }
     
     function getTransform(time) {
-        var newTransform = {};
-        
-        if (dataArray != undefined) {
-            var cameraChanges = dataArray.cameraTransforms;
-            var nextTransform = cameraChanges[cameraChanges.length-1];
-            var previousTransform = cameraChanges[0];
-            for(var i=0; i< cameraChanges.length; i++){
-                var currentTransform = cameraChanges[i];
-                if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
-                    previousTransform = currentTransform;
+        if(!freePosition) {
+            var newTransform = {};
+            
+            if (dataArray != undefined) {
+                var cameraChanges = dataArray.cameraTransforms;
+                var nextTransform = cameraChanges[cameraChanges.length-1];
+                var previousTransform = cameraChanges[0];
+                for(var i=0; i< cameraChanges.length; i++){
+                    var currentTransform = cameraChanges[i];
+                    if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
+                        previousTransform = currentTransform;
+                    }
+                    if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
+                        nextTransform = currentTransform;
+                    }
                 }
-                if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
-                    nextTransform = currentTransform;
+                newTransform = jQuery.extend(true,{},previousTransform);
+                if (nextTransform.time !== previousTransform.time) {
+                    var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
+                    newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
+                    newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
+                    newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
                 }
+                newTransform.tx = newTransform.tx/newTransform.m11*xscale;
+                newTransform.ty = newTransform.ty/newTransform.m11*yscale;
             }
-            newTransform = jQuery.extend(true,{},previousTransform);
-            if (nextTransform.time !== previousTransform.time) {
-                var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
-                newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
-                newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
-                newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
-            }
-            newTransform.tx = newTransform.tx/newTransform.m11*xscale;
-            newTransform.ty = newTransform.ty/newTransform.m11*yscale;
+            
+            return newTransform;
         }
-        
-        return newTransform;
+        else
+            return {tx: translateX, ty: translateY, m11: totalZoom};
     }
     
     function graphData(){
@@ -405,6 +412,10 @@ var Grapher = function() {
     
     //displays one frame
     function oneFrame(current){
+        
+        var actualfurthest = furthestpoint;
+        if(furthestpoint < current)
+            furthestpoint = current;
         
         for(var i=0; i<numStrokes; i++){ //for all strokes
             var currentStroke = dataArray.visuals[i];
@@ -483,6 +494,8 @@ var Grapher = function() {
                 }
             }
         }
+        
+        furthestpoint = actualfurthest;
     }
     
     //turns total seconds into a timestamp of minute:seconds
@@ -593,26 +606,29 @@ var Grapher = function() {
         isDragging = true;
         previousX = e.pageX;
         previousY = e.pageY;
-        if(!wasDragging)
+        if(!wasDragging & !freePosition) {
             initialPause=paused;
             pause(); // only pauses the first time
+        }
         wasDragging = false;
     }
     
     //triggered when mouse dragged across canvas
     function dragging(e) {
+        var x = e.pageX,
+            y = e.pageY;
         if(isDragging) {
             wasDragging = true;
             if(dragToPan) {
-                var newTx = (e.pageX-previousX);
-                var newTy = (e.pageY-previousY);
+                var newTx = (x-previousX);
+                var newTy = (y-previousY);
                 pan(newTx, newTy);
-                previousX = e.pageX;
-                previousY = e.pageY;
+                previousX = x;
+                previousY = y;
             }
             else {
-                zoomRectW = Math.max(offset.left, Math.min(e.pageX, offset.left+c.width))-previousX;
-                zoomRectH = Math.max(offset.top, Math.min(e.pageY, offset.top+c.height))-previousY;
+                zoomRectW = Math.max(offset.left, Math.min(x, offset.left+c.width))-previousX;
+                zoomRectH = Math.max(offset.top, Math.min(y, offset.top+c.height))-previousY;
                 if(zoomRectW/zoomRectH > c.width/c.height) //maintains aspect ratio of zoom region
                     zoomRectH = c.height/c.width*zoomRectW;
                 else
@@ -627,6 +643,43 @@ var Grapher = function() {
                                  (previousY-offset.top-translateY)/totalZoom,
                                  zoomRectW/totalZoom, zoomRectH/totalZoom);
             }
+        }
+        
+        //CHANGE THIS - for mouse move to show stuff in fullscreenmode
+        if(fullscreenMode) {
+            //NOT VISIBLE AND MOUSED OVER - SHOW
+            if(!controlsVisible & 
+               ((y > c.height-15 & 
+                 x > offset.left & 
+                 x < offset.left+c.width) | 
+                (x < offset.left+c.width & x > offset.left+c.width-15)))
+                animateControls(true);
+            //VISIBLE AND NOT MOUSED OVER - HIDE
+            if(controlsVisible & 
+               ((y < c.height-$('.controls').outerHeight(true) & 
+                 x < offset.left+c.width-$('.sidecontrols').outerWidth(true)) | 
+                x < offset.left | 
+                x > offset.left+c.width))
+                animateControls(false);
+        }
+    }
+    
+    function animateControls(show) {
+        if(show) {
+            console.log('show');
+            $('.controls').show();
+            $('.controls').animate({opacity: 1},200);
+            $('.sidecontrols').show();
+            $('.sidecontrols').animate({opacity: 1},200);
+            controlsVisible = true;
+        }
+        else {
+            console.log('hide');
+            $('.controls').animate({opacity: 0},200);
+            setTimeout(function(){$('.controls').hide();},200);
+            $('.sidecontrols').animate({opacity: 0},200);
+            setTimeout(function(){$('.sidecontrols').hide();},200);
+            controlsVisible = false;
         }
     }
     
@@ -674,11 +727,10 @@ var Grapher = function() {
             translateX = nx, translateY = ny, totalZoom = nz;
             clearFrame();
             oneFrame(currentI);
-            if(callback !== undefined)
-                callback();
             $('#zoomslider').slider('value',nz);
             displayZoom(totalZoom);
-            callback();
+            if(callback !== undefined)
+                callback();
         }
         else {
             // Use the identity matrix while clearing the canvas
@@ -714,6 +766,7 @@ var Grapher = function() {
             paused=false;
             setTime=false;
             initialTime=Date.now()-offsetTime;
+            draw=clearInterval(draw);
             draw=setInterval(graphData,50);
             if (isAudio) audio.currentTime=currentI;
             audio.play();
@@ -820,13 +873,13 @@ var Grapher = function() {
         
         var buttonWidths=parseInt(vidWidth* 50 / 575);
         if (buttonWidths > 50 ) buttonWidths=50;
-        $('.buttons').css('width', buttonWidths+5);
+        $('.buttons').css('width', buttonWidths+75);
         $('.start').css('width',buttonWidths);
         $('.start').css('background-size',buttonWidths);
         $('.jumpForward').css('width',buttonWidths/2-2);
         $('.jumpBack').css('width',buttonWidths/2-2);
         
-        var timeControlWidth=parseInt(vidWidth)-buttonWidths-25;
+        var timeControlWidth=parseInt(vidWidth)-buttonWidths-75;
         $('.timeControls').css('width',timeControlWidth);
         $('#slider').css('width',timeControlWidth-150);
         $('#slider').css('margin-top',buttonWidths/2-5);
@@ -842,7 +895,6 @@ var Grapher = function() {
         oneFrame(currentI);
     }
     
-    var fullscreenMode = false;
     function resizeVisuals(){
         var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
@@ -862,8 +914,7 @@ var Grapher = function() {
         }
         
         if(fullscreenMode) {
-            $('body').css({padding: 0,
-                           margin: 0});
+            $('body').css('padding', 0);
             $('body').find('.menulink').hide();
             c.height = windowHeight;
             c.width = xmax/ymax*c.height;
@@ -872,23 +923,31 @@ var Grapher = function() {
                 c.height = ymax/xmax*c.width;
             }
             $('.lecture').css({height: c.height,
-                               width: c.width});
+                               width: c.width,
+                               margin: 'auto auto'});
             $('.sidecontrols').css({position: 'absolute',
                                     top: 0,
-                                    left: ((c.width-$('.sidecontrols').width()-10)+'px'),
-                                    'background-color':'rgba(0,0,0,0.1)'});
+                                    left: (($('.video').offset().left+
+                                            $('.video').width()-
+                                            $('.sidecontrols').outerWidth(true))+'px'),
+                                    'background-color':'rgba(235,235,235,0.9)'});
             $('.controls').css({position: 'absolute',
-                                top: ((c.height-$('.controls').height()-10)+'px'),
-                                left: 0,
-                                'background-color':'rgba(0,0,0,0.1)'});
+                                top: ((c.height-$('.controls').outerHeight(true))+'px'),
+                                left: $('.video').offset().left,
+                                'background-color':'rgba(235,235,235,0.9)'});
         }
         else {
+            $('body').css('padding', '50px');
+            $('body').find('.menulink').show();
             c.height=ymax * videoDim/scaleFactor;
             c.width=xmax * videoDim/scaleFactor;
+            $('.lecture').css({height: 'auto',
+                               width: 'auto'});
             $('.sidecontrols').css({position: 'absolute',
                                     top: ($('.video').offset().top+'px'),
                                     left: (($('.video').offset().left+
-                                            $('.video').width()+10)+'px')});
+                                            $('.video').width()+10)+'px'),
+                                    'background-color':'none'});
             $('.controls').css({position: 'absolute',
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
@@ -920,12 +979,19 @@ var Grapher = function() {
         var move = input.move;
         var up = input.up;
         var double = input.double;
+        var touch = input.touch;
         var tolerance = input.tolerance;
         var doubled = false;
         function onTouch() {
             element.on('touchend', listenTouch);
-            element.on('touchstart', function(e) {down(e.originalEvent.touches[0]);});
-            element.on('touchmove', function(e) {move(e.originalEvent.touches[0]);});
+            element.on('touchstart', function(e) {
+                down(e.originalEvent.touches[0]);
+            });
+            element.on('touchmove', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                move(e.originalEvent.touches[0]);
+            });
         }
         function onClick() {
             element.on('mouseup', listenClick);
@@ -944,7 +1010,7 @@ var Grapher = function() {
             },tolerance);
             element.on('touchend', function() {
                 clearTimeout(click);
-                double();
+                double(e);
                 doubled = true;
                 element.off('touchend');
                 onTouch();
@@ -968,8 +1034,35 @@ var Grapher = function() {
                 onClick();
             });
         }
-        if(!input.touch) onClick();
+        if(!touch) onClick();
         else onTouch();
+        
+        var exports = {
+            off: function() {
+                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
+            },
+            toggle: function() {
+                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
+                touch = !touch;
+                if(!touch) onClick();
+                else onTouch();
+            }
+        };
+        
+        return exports;
+    }
+    
+    function getURLParameter(name,data) {
+        return decodeURI(
+            (RegExp('[?|&]'+name + '=' + '(.+?)(&|$)').exec(data)||[,null])[1]
+        );
+    }
+    
+    function urlExists(url){
+        var http=new XMLHttpRequest();
+        http.open('HEAD',url,false);
+        http.send();
+        return http.status!=404;
     }
     
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
@@ -1005,10 +1098,22 @@ var Grapher = function() {
         root=$('.pentimento');
         root.append(template);
         
+        var filename=getURLParameter('n',location.search);
+        var t=getURLParameter('t',location.search);
+        var end=getURLParameter('end',location.search);
+        console.log(filename,t,end);
+        
+        datafile=filename+".lec";
+        audioSource=filename+".mp3";
+        
+        if (!urlExists(audioSource)) {
+            audioSource='';
+            isAudio=false;
+        }
+        
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
-        if (audioSource == '' ) isAudio=false;
         
         $('.buttons').append('<button class="jumpBack"> < </button>');
         $('.buttons').append('<button class="jumpForward"> > </button>');
@@ -1052,7 +1157,7 @@ var Grapher = function() {
 		context.strokeStyle='black';
 		context.lineCap='round';
         
-        doubleClickHandler({
+        var doubleClick = doubleClickHandler({
             element: $(window),
             down: function(e) {
                 if(e.target === c)
@@ -1083,7 +1188,7 @@ var Grapher = function() {
         c.addEventListener('mousewheel', function(e){
             e.preventDefault();
             e.stopPropagation();
-            if(!wasDragging)
+            if(!wasDragging & !paused & !freePosition)
                 pause();
             if(!dragToPan) {
                 var scroll = e.wheelDeltaY;
@@ -1146,17 +1251,29 @@ var Grapher = function() {
         
         $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
         $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
+        $('.sidecontrols').append('<br><button id="fullscreen">Exit FS</button>');
+        $('.sidecontrols').append('<br><button id="touch">Touch</button>');
         
         $('.sidecontrols').css('position', 'absolute');
         
         $('#revertPos').on('click', function () {
-            if(!paused) pause();
+            if(!paused & !freePosition) pause();
+            freePosition = false;
             var next = getTransform(currentI);
             animateToPos(Date.now(), 200, next.tx, next.ty, next.m11);
         });
         $('#seeAll').on('click', function() {
-            if(!paused) pause();
+            if(!paused & !freePosition) pause();
             animateToPos(Date.now(), 200, 0, 0, minZoom);
+        });
+        $('#fullscreen').on('click', function() {
+            fullscreenMode = !fullscreenMode;
+            $(this).html(fullscreenMode?"Exit FS":"Fullscreen");
+            resizeVisuals();
+        });
+        $('#touch').on('click', function() {
+            $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
+            doubleClick.toggle();
         });
                 
         root.find('.start').on('click',function() {
@@ -1174,8 +1291,23 @@ var Grapher = function() {
                 //trigger button click
                 root.find('.start').click();
             }
+            if (event.keyCode==102) {
+                freePosition = !freePosition;
+                if(!freePosition) { //animate to playing position if reverting from free
+                    var initialpaused = paused;
+                    if(!paused)
+                        pause();
+                    paused = initialpaused;
+                    var next = getTransform(currentI);
+                    animateToPos(Date.now(), 200, next.tx, next.ty, next.m11, function() {
+                        if(!paused) {
+                            paused = true;
+                            start();
+                        }
+                    });
+                }
+            }
         });
-        
         
         console.log(localStorage);
         

@@ -95,15 +95,15 @@ input[type='button']:focus{
 }
 
 .pause{
-    background-image: url('http://web.mit.edu/lilis/www/videolec/pause.png');
+    background-image: url('pause.png');
 }
 
 .start{
-    background-image: url('http://web.mit.edu/lilis/www/videolec/play.png');
+    background-image: url('play.png');
 }
 
 .stop{
-    background-image: url('http://web.mit.edu/lilis/www/videolec/stop.png');
+    background-image: url('stop.png');
 }
 
 #totalTime{
@@ -163,6 +163,7 @@ input[type='button']:focus{
     margin-top:20px;
     margin-bottom:10px;
     font-size: 12px;
+    width: 60px;
 }
 
 .toggleControls .left{

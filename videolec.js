@@ -975,7 +975,6 @@ var Grapher = function() {
         var move = input.move;
         var up = input.up;
         var double = input.double;
-        var touch = input.touch;
         var tolerance = input.tolerance;
         var doubled = false;
         function onTouch() {
@@ -1002,14 +1001,14 @@ var Grapher = function() {
                     up();
                 doubled = false;
                 element.off('touchend');
-                onTouch();
+                on();
             },tolerance);
             element.on('touchend', function() {
                 clearTimeout(click);
                 double(e);
                 doubled = true;
                 element.off('touchend');
-                onTouch();
+                on();
             });
         }
         function listenClick(e) {
@@ -1020,32 +1019,31 @@ var Grapher = function() {
                     up();
                 doubled = false;
                 element.off('mouseup');
-                onClick();
+                on();
             },tolerance);
             element.on('mouseup', function() {
                 clearTimeout(click);
                 double(e);
                 doubled = true;
                 element.off('mouseup');
-                onClick();
+                on();
             });
         }
-        if(!touch) onClick();
-        else onTouch();
         
-        var exports = {
-            off: function() {
-                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
-            },
-            toggle: function() {
-                element.off('mouseup mousedown mousemove touchstart touchmove touchend');
-                touch = !touch;
-                if(!touch) onClick();
-                else onTouch();
-            }
-        };
+        function on() {
+            element.on('mousedown', function(e) {
+                element.off('touchstart touchmove touchend');
+                onClick();
+                down(e);
+            });
+            element.on('touchstart', function(e) {
+                element.off('mousedown mousemove mouseup');
+                onTouch();
+                down(e.originalEvent.touches[0]);
+            });
+        }
         
-        return exports;
+        on();
     }
     
     function getURLParameter(name,data) {
@@ -1177,7 +1175,6 @@ var Grapher = function() {
                     animateZoom();
                 }
             },
-            touch: false,
             tolerance: 200
         });
         
@@ -1248,7 +1245,6 @@ var Grapher = function() {
         $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
         $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
         $('.sidecontrols').append('<br><button id="fullscreen">Fullscreen</button>');
-        $('.sidecontrols').append('<br><button id="touch">Touch</button>');
         
         $('.sidecontrols').css('position', 'absolute');
         
@@ -1274,10 +1270,6 @@ var Grapher = function() {
             }
             $(this).html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
             resizeVisuals();
-        });
-        $('#touch').on('click', function() {
-            $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
-            doubleClick.toggle();
         });
                 
         root.find('.start').on('click',function() {

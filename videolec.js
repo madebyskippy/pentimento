@@ -20,7 +20,7 @@ var Grapher = function() {
     var zoomRectW = 0, zoomRectH = 0;
     var offset;
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
-    var fullscreenMode = true;
+    var fullscreenMode = false;
     var controlsVisible = true;
     var freePosition = false;
     
@@ -648,18 +648,12 @@ var Grapher = function() {
         //CHANGE THIS - for mouse move to show stuff in fullscreenmode
         if(fullscreenMode) {
             //NOT VISIBLE AND MOUSED OVER - SHOW
-            if(!controlsVisible & 
-               ((y > c.height-15 & 
-                 x > offset.left & 
-                 x < offset.left+c.width) | 
-                (x < offset.left+c.width & x > offset.left+c.width-15)))
+            if(!controlsVisible & (y > $(window).height()-15 | x > $(window).width()-15))
                 animateControls(true);
             //VISIBLE AND NOT MOUSED OVER - HIDE
             if(controlsVisible & 
-               ((y < c.height-$('.controls').outerHeight(true) & 
-                 x < offset.left+c.width-$('.sidecontrols').outerWidth(true)) | 
-                x < offset.left | 
-                x > offset.left+c.width))
+               (y < $(window).height()-$('.controls').outerHeight(true) & 
+                x < $(window).width()-$('.sidecontrols').outerWidth(true)))
                 animateControls(false);
         }
     }
@@ -874,7 +868,8 @@ var Grapher = function() {
     }
     
     function resizeControls(vidWidth){
-        
+        if(fullscreenMode)
+            vidWidth = $(window).width();
         $('.controls').css('width', vidWidth);
         
         var buttonWidths=parseInt(vidWidth* 50 / 575);
@@ -892,8 +887,10 @@ var Grapher = function() {
         $('.time').css('margin-top',buttonWidths/2-5);
         $('#totalTime').css('margin-top',buttonWidths/2-5);
         
-        
-        $('.sidecontrols').css('height',2*vidWidth/3);
+        if(fullscreenMode)
+            $('.sidecontrols').css('height', $(window).height());
+        else
+            $('.sidecontrols').css('height',2*vidWidth/3);
         $('#zoomslider').css('height','100%');
         displayZoom(totalZoom);
         
@@ -933,13 +930,12 @@ var Grapher = function() {
                                margin: 'auto auto'});
             $('.sidecontrols').css({position: 'absolute',
                                     top: 0,
-                                    left: (($('.video').offset().left+
-                                            $('.video').width()-
+                                    left: ((windowWidth-
                                             $('.sidecontrols').outerWidth(true))+'px'),
                                     'background-color':'rgba(235,235,235,0.9)'});
             $('.controls').css({position: 'absolute',
-                                top: ((c.height-$('.controls').outerHeight(true))+'px'),
-                                left: $('.video').offset().left,
+                                top: ((windowHeight-$('.controls').outerHeight(true))+'px'),
+                                left: 0,
                                 'background-color':'rgba(235,235,235,0.9)'});
         }
         else {
@@ -1257,7 +1253,7 @@ var Grapher = function() {
         
         $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
         $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
-        $('.sidecontrols').append('<br><button id="fullscreen">Exit FS</button>');
+        $('.sidecontrols').append('<br><button id="fullscreen">Fullscreen</button>');
         $('.sidecontrols').append('<br><button id="touch">Touch</button>');
         
         $('.sidecontrols').css('position', 'absolute');
@@ -1274,7 +1270,15 @@ var Grapher = function() {
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
-            $(this).html(fullscreenMode?"Exit FS":"Fullscreen");
+            if(fullscreenMode) {
+                try {root[0].mozRequestFullScreen();}
+                catch(e) {root[0].webkitRequestFullScreen();}
+            }
+            else {
+                try {document.mozCancelFullScreen();}
+                catch(e) {document.webkitCancelFullScreen();}
+            }
+            $(this).html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
             resizeVisuals();
         });
         $('#touch').on('click', function() {

@@ -1,9 +1,4 @@
-//generates URLs of pages
-
 /*
-
-index creates URLs
-
 parameters for URLs:
     -datafile name n
     -start time (optional) t
@@ -11,14 +6,9 @@ parameters for URLs:
     
     videolec/lecture.html?n=filename&t=51&end=63
 
-index.html makes <span>filename</span>
-generator.js finds each span, uses the data within to generate a url
+index.html makes <span class=lec>filename</span>
+generator.js finds each lec class, uses the data within to generate a url
     replaces the filename with a link to the lecture
-    
-    todo:
-        -first, make sure videolec.js can read the url data
-        -implement
-
 */
 
 $(document).ready(function(){

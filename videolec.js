@@ -755,7 +755,12 @@ var Grapher = function() {
                 "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
             $('#slider .ui-slider-handle').css('background','#0b0');
             root.find('.video').css('border','1px solid #eee');
-            $('.onScreenStatus').css('visibility',"hidden");
+            
+            $('#pauseIcon').attr("src",
+                'http://web.mit.edu/lilis/www/videolec/play_big.png');
+            $('.onScreenStatus').css('opacity',".5");
+            $('.onScreenStatus').css('visibility',"visible");
+            fadeSign();
             
             paused=false;
             setTime=false;
@@ -775,8 +780,11 @@ var Grapher = function() {
         root.find('.video').css('border','1px solid #f88');
         
         if (!paused){
+            $('#pauseIcon').attr("src",
+                'http://web.mit.edu/lilis/www/videolec/pause_big.png');
+            $('.onScreenStatus').css('opacity',".5");
             $('.onScreenStatus').css('visibility',"visible");
-            fadePauseSign();
+            fadeSign();
         }
         
         paused=true;
@@ -795,10 +803,7 @@ var Grapher = function() {
         paused=true;
         draw=clearInterval(draw);
         
-//        var local = { 'currentTime': undefined, 
-//                     'furthestPoint': undefined};
-        
-        localStorage[datafile]=undefined;//JSON.stringify(local);
+        localStorage[datafile]=undefined;
         
         
         root.find('.start').css('background-image',
@@ -815,7 +820,8 @@ var Grapher = function() {
         offsetTime=0;
     }
     
-    function fadePauseSign(){
+    function fadeSign(){
+        $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').animate({
             opacity: 0
         },1000,function(){
@@ -1048,7 +1054,7 @@ var Grapher = function() {
     
     function getURLParameter(name,data) {
         return decodeURI(
-            (RegExp('[?|&]'+name + '=' + '(.+?)(&|$)').exec(data)||[,null])[1]
+            (RegExp('[?|&]'+name + '=' + '(.+?)(&|$)').exec(data)||[,-100])[1]
         );
     }
     
@@ -1097,8 +1103,8 @@ var Grapher = function() {
         var end=getURLParameter('end',location.search);
         console.log(filename,t,end);
         
-        datafile=filename+".lec";
-        audioSource=filename+".mp3";
+        datafile="lectures/"+filename+".lec";
+        audioSource="lectures/"+filename+".mp3";
         
         if (!urlExists(audioSource)) {
             audioSource='';
@@ -1311,6 +1317,10 @@ var Grapher = function() {
             var local=JSON.parse(localStorage[datafile]);
             currentI=local.currentTime;
             furthestpoint=local.furthestPoint;
+            offsetTime=currentI*1000;
+        }
+        if (t != -100) {
+            currentI=t;
             offsetTime=currentI*1000;
         }
         

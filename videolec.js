@@ -288,13 +288,14 @@ var Grapher = function() {
     function drawScrollBars(tx, ty, z) {
         context.beginPath();
         context.strokeStyle = 'rgba(0,0,0,0.3)';
+        context.lineCap = 'round';
         context.lineWidth = 8;
+        scrollBarLeft = (-tx-boundingRect.xmin*xscale*z)/(boundingRect.width*xscale*z)*c.width+10;
+        scrollBarTop = (-ty-boundingRect.ymin*yscale*z)/(boundingRect.height*yscale*z)*c.height+10;
         scrollBarWidth = xmax/boundingRect.width/z*c.width-20;
-        scrollBarLeft = (-tx-boundingRect.xmin*xscale)/boundingRect.width/xscale/z*c.width+10;
+        scrollBarHeight = ymax/boundingRect.height/z*c.height-20;
         context.moveTo(scrollBarLeft, c.height-10);
         context.lineTo(scrollBarLeft+scrollBarWidth, c.height-10);
-        scrollBarHeight = ymax/boundingRect.height/z*c.height-20;
-        scrollBarTop = (-ty-boundingRect.ymin*yscale)/boundingRect.height/yscale/z*c.height+10;
         context.moveTo(c.width-10, scrollBarTop);
         context.lineTo(c.width-10, scrollBarTop+scrollBarHeight);
         context.stroke();
@@ -303,8 +304,9 @@ var Grapher = function() {
     function drawBox(tx, ty, z) {
         context.beginPath();
         context.strokeStyle = 'rgba(0,0,255,0.2)';
+        context.lineCap = 'butt';
         context.lineWidth = 5/z;
-        context.setLineDash([5,2]);
+        context.setLineDash([8,5]);
         var width = xmax*xscale/z;
         var height = ymax*yscale/z;
         context.moveTo(-tx, -ty);
@@ -321,8 +323,8 @@ var Grapher = function() {
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, c.width, c.height);
         
-        translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale);
-        translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
+        translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale*totalZoom);
+        translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
         if((audio.paused | freePosition) & totalZoom !== minZoom & !isScreenshot) {
@@ -1125,8 +1127,6 @@ var Grapher = function() {
         c=root.find('.video')[0];
         
         context=c.getContext('2d');
-		context.strokeStyle='black';
-		context.lineCap='round';
         
         var doubleClick = doubleClickHandler({
             element: $(window),

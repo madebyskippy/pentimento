@@ -4,6 +4,8 @@ var Grapher = function() {
     var context;
     var contextHeight=600;
     
+    var root, sidecontrols, controls;
+    
     var ymax=800;
     var ymin=0;
     var xmin=0;
@@ -18,11 +20,13 @@ var Grapher = function() {
     var wasDragging = false; //true if currently paused and panning/zooming
     var dragToPan = true; //true if dragging to pan, false if dragging to zoom
     var zoomRectW = 0, zoomRectH = 0;
+    var zoomRect;
     var offset;
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     var fullscreenMode = false;
     var controlsVisible = true;
     var freePosition = false;
+    var animating = false;
     
     //LIMITS ON THINGS
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
@@ -38,7 +42,7 @@ var Grapher = function() {
     var imax;	// maximum time value
     
     var currentI=0; //current index of time (in seconds)
-    var initialPause; //used in dragging 
+    var initialPause = true; //used in dragging 
         //(dragging pauses but unpauses if it was just a click)
     var draw;
     
@@ -268,28 +272,22 @@ var Grapher = function() {
             currentI = time;
             audio.currentTime = time;
             
-            if(initialPause) {
+            if(!freePosition) {
                 var newTransform = getTransform(currentI);
+                freePosition = true;
                 animateToPos(Date.now(), 200, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
                     $('#zoomslider').slider('value', totalZoom);
                     displayZoom(totalZoom);
                     changeSlider(time);
+                    freePosition = false;
                 });
             }
-            //animate to pos with new transform, put draw-one-frame-stuff in callback function
-        }
-        if(!initialPause){ // if it wasn't paused, keep playing
-            var next = getTransform(currentI);
-            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
-                audio.play();
-            });
         }
     }
     
     function drawScrollBars(tx, ty, z) {
         context.beginPath();
         context.strokeStyle = 'rgba(0,0,0,0.3)';
-        context.lineCap = 'round';
         context.lineWidth = 8;
         scrollBarWidth = xmax/boundingRect.width/z*c.width-20;
         scrollBarLeft = (-tx-boundingRect.xmin*xscale)/boundingRect.width/xscale/z*c.width+10;
@@ -302,6 +300,22 @@ var Grapher = function() {
         context.stroke();
     }
     
+    function drawBox(tx, ty, z) {
+        context.beginPath();
+        context.strokeStyle = 'rgba(0,0,255,0.2)';
+        context.lineWidth = 5/z;
+        context.setLineDash([5,2]);
+        var width = xmax*xscale/z;
+        var height = ymax*yscale/z;
+        context.moveTo(-tx, -ty);
+        context.lineTo(-tx+width, -ty);
+        context.lineTo(-tx+width, -ty+height);
+        context.lineTo(-tx, -ty+height);
+        context.lineTo(-tx, -ty);
+        context.stroke();
+        context.setLineDash([0]);
+    }
+    
     function clearFrame() {
         // Use the identity matrix while clearing the canvas
         context.setTransform(1, 0, 0, 1, 0, 0);
@@ -311,13 +325,21 @@ var Grapher = function() {
         translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
-        if(audio.paused & totalZoom !== minZoom & !isScreenshot) {
+        if((audio.paused | freePosition) & totalZoom !== minZoom & !isScreenshot) {
             drawScrollBars(translateX, translateY, totalZoom);
         }
         
         // Restore the transform
         context.setTransform(totalZoom,0,0,totalZoom,
                              translateX,translateY);
+        
+        //draw indicator box
+        if(freePosition & !animating) {
+            freePosition = false;
+            var box = getTransform(audio.currentTime);
+            drawBox(box.tx, box.ty, box.m11);
+            freePosition = true;
+        }
     }
     
     function getDistance(x1,y1,x2,y2){
@@ -370,12 +392,14 @@ var Grapher = function() {
         
         localStorage[datafile]=JSON.stringify(local);
         
-        var newTransform = getTransform(currentI);
-        totalZoom = newTransform.m11;
-        translateX = newTransform.tx;
-        translateY = newTransform.ty;
-        $('#zoomslider').slider('value', totalZoom);
-        displayZoom(totalZoom);
+        if(!freePosition) {
+            var newTransform = getTransform(currentI);
+            totalZoom = newTransform.m11;
+            translateX = newTransform.tx;
+            translateY = newTransform.ty;
+            $('#zoomslider').slider('value', totalZoom);
+            displayZoom(totalZoom);
+        }
         clearFrame();
         oneFrame(currentI);
 	}
@@ -594,9 +618,9 @@ var Grapher = function() {
         isDragging = true;
         previousX = e.pageX;
         previousY = e.pageY;
-        if(!audio.paused)
-            freePosition = true;
         wasDragging = false;
+        if(!dragToPan)
+            zoomRect.css({visibility: 'visible', top: previousY, left: previousX});
     }
     
     //triggered when mouse dragged across canvas
@@ -604,6 +628,8 @@ var Grapher = function() {
         var x = e.pageX,
             y = e.pageY;
         if(isDragging) {
+            if(!freePosition)
+                setFreePosition(true);
             wasDragging = true;
             if(dragToPan) {
                 var newTx = (x-previousX);
@@ -623,13 +649,11 @@ var Grapher = function() {
                     clearFrame();
                     oneFrame(audio.currentTime);
                 }
+                zoomRect.css({width: zoomRectW, height: zoomRectH});
                 if(c.width/Math.abs(zoomRectW/totalZoom) < maxZoom)
-                    context.fillStyle = 'rgba(0,255,0,0.1)';
+                    zoomRect.css('background-color', 'rgba(0,255,0,0.1)');
                 else
-                    context.fillStyle = 'rgba(255,0,0,0.1)';
-                context.fillRect((previousX-offset.left-translateX)/totalZoom,
-                                 (previousY-offset.top-translateY)/totalZoom,
-                                 zoomRectW/totalZoom, zoomRectH/totalZoom);
+                    zoomRect.css('background-color', 'rgba(255,0,0,0.1)');
             }
         }
         
@@ -640,8 +664,8 @@ var Grapher = function() {
                 animateControls(true);
             //VISIBLE AND NOT MOUSED OVER - HIDE
             if(controlsVisible & 
-               (y < $(window).height()-$('.controls').outerHeight(true) & 
-                x < $(window).width()-$('.sidecontrols').outerWidth(true)))
+               (y < $(window).height()-controls.outerHeight(true) & 
+                x < $(window).width()-sidecontrols.outerWidth(true)))
                 animateControls(false);
         }
     }
@@ -649,18 +673,18 @@ var Grapher = function() {
     function animateControls(show) {
         if(show) {
             console.log('show');
-            $('.controls').show();
-            $('.controls').animate({opacity: 1},200);
-            $('.sidecontrols').show();
-            $('.sidecontrols').animate({opacity: 1},200);
+            controls.css('visibility','visible');
+            controls.animate({opacity: 1},200);
+            sidecontrols.css('visibility','visible');
+            sidecontrols.animate({opacity: 1},200);
             controlsVisible = true;
         }
         else {
             console.log('hide');
-            $('.controls').animate({opacity: 0},200);
-            setTimeout(function(){$('.controls').hide();},200);
-            $('.sidecontrols').animate({opacity: 0},200);
-            setTimeout(function(){$('.sidecontrols').hide();},200);
+            controls.animate({opacity: 0},200);
+            setTimeout(function(){controls.css('visibility','hidden');},200);
+            sidecontrols.animate({opacity: 0},200);
+            setTimeout(function(){sidecontrols.css('visibility','hidden');},200);
             controlsVisible = false;
         }
     }
@@ -687,6 +711,7 @@ var Grapher = function() {
                 }
                 zoomRectW = 0;
                 zoomRectH = 0;
+                zoomRect.css({visibility: 'hidden', height: 0, width: 0});
             }
             
             if(!wasDragging) { // click
@@ -699,21 +724,23 @@ var Grapher = function() {
     
     //animates back to playing position before playing
     function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback) {
+        animating = true;
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
         ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
         
         var interpolatedTime = (Date.now() - startTime)/duration;
         
         if(interpolatedTime > 1 | (tx === nx & ty === ny & tz === nz)) {
+            animating = false;
             translateX = nx, translateY = ny, totalZoom = nz;
-            if(audio.paused) {
-                clearFrame();
-                oneFrame(audio.currentTime);
-            }
             $('#zoomslider').slider('value',nz);
             displayZoom(totalZoom);
             if(callback !== undefined)
                 callback();
+            if(audio.paused) {
+                clearFrame();
+                oneFrame(audio.currentTime);
+            }
         }
         else {
             totalZoom = tz + (nz - tz)*interpolatedTime;
@@ -728,7 +755,7 @@ var Grapher = function() {
             
             setTimeout(function() {
                 animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback);
-            }, 10);
+            }, 50);
         }
     }
     
@@ -790,39 +817,10 @@ var Grapher = function() {
         });
     }
     
-    function jump(val){
-        var initialpause=paused;
-        pause();
-        paused=initialpause;
-        var time=currentI+val;
-        if (time > imax) time = parseInt(imax);
-        if (time < 0) time=0;
-        currentI=time;
-        offsetTime=time*1000;
-        setTime=true;
-            
-        var newTransform = getTransform(currentI);
-        totalZoom = newTransform.m11;
-        translateX = newTransform.tx;
-        translateY = newTransform.ty;
-        $('#zoomslider').slider('value', totalZoom);
-        displayZoom(totalZoom);
-        
-        clearFrame();
-        oneFrame(time);
-        changeSlider(time);
-        if (isAudio) audio.currentTime=time;
-        
-        if(!paused){ // if it wasn't paused, keep playing
-            paused=true; //it only starts if it was previously paused.
-            start();
-        }
-    }
-    
     function resizeControls(vidWidth){
         if(fullscreenMode)
             vidWidth = $(window).width();
-        $('.controls').css('width', vidWidth);
+        controls.css('width', vidWidth);
         
         var bigButtonWidths=parseInt(vidWidth* 50 / 575);
         var smallButtonWidths=parseInt(vidWidth* 30/575);
@@ -848,9 +846,9 @@ var Grapher = function() {
         $('#totalTime').css('margin-top',bigButtonWidths/2-5);
         
         if(fullscreenMode)
-            $('.sidecontrols').css('height', $(window).height());
+            sidecontrols.css('height', $(window).height());
         else
-            $('.sidecontrols').css('height',2*vidWidth/3);
+            sidecontrols.css('height',2*vidWidth/3);
         $('#zoomslider').css('height','100%');
         displayZoom(totalZoom);
         
@@ -859,7 +857,6 @@ var Grapher = function() {
     }
     
     function resizeVisuals(){
-        var c=$('.pentimento').find('.video')[0];
         var windowWidth=$(window).width();
         var windowHeight=$(window).height();
         var videoDim;
@@ -877,8 +874,7 @@ var Grapher = function() {
         }
         
         if(fullscreenMode) {
-            $('body').css('padding', 0);
-            $('body').find('.menulink').hide();
+            root.find('.menulink').hide();
             c.height = windowHeight;
             c.width = xmax/ymax*c.height;
             if(c.width > windowWidth) {
@@ -888,33 +884,34 @@ var Grapher = function() {
             $('.lecture').css({height: c.height,
                                width: c.width,
                                margin: 'auto auto'});
-            $('.sidecontrols').css({position: 'absolute',
+            sidecontrols.css({position: 'absolute',
                                     top: 0,
                                     left: ((windowWidth-
-                                            $('.sidecontrols').outerWidth(true))+'px'),
+                                            sidecontrols.outerWidth(true))+'px'),
                                     'background-color':'rgba(235,235,235,0.9)'});
-            $('.controls').css({position: 'absolute',
-                                top: ((windowHeight-$('.controls').outerHeight(true))+'px'),
+            controls.css({position: 'absolute',
+                                top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,
                                 'background-color':'rgba(235,235,235,0.9)'});
         }
         else {
-            $('body').css('padding', '50px');
-            $('body').find('.menulink').show();
+            root.find('.menulink').show();
             c.height=ymax * videoDim/scaleFactor;
             c.width=xmax * videoDim/scaleFactor;
             $('.lecture').css({height: 'auto',
                                width: 'auto'});
-            $('.sidecontrols').css({position: 'absolute',
+            sidecontrols.css({position: 'absolute',
                                     top: ($('.video').offset().top+'px'),
                                     left: (($('.video').offset().left+
                                             $('.video').width()+10)+'px'),
-                                    'background-color':''});
-            $('.controls').css({position: 'absolute',
+                                    'background-color':'rgba(255,255,255,0)',
+                                    visibility: 'visible',opacity: 1});
+            controls.css({position: 'absolute',
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
                                 left: ($('.video').offset().left+'px'),
-                                'background-color':''});
+                                'background-color':'rgba(255,255,255,0)',
+                                visibility: 'visible',opacity: 1});
         }
         
         $('.captions').css('width',c.width);
@@ -932,9 +929,15 @@ var Grapher = function() {
         $('#pauseIcon').css('height',onScreenStatusWidth+"px");
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
+        
+        $('#revertPos').css({top: offset.top+10,
+                             left: (offset.left+c.width-100*xscale-20),
+                             height:(100*yscale),
+                             width:(100*xscale)});
     }
     
     //custom handler to distinguish between single- and double-click events
+    //TODO: test on actual touch device
     function doubleClickHandler(input) {
         var element = input.element;
         var down = input.down;
@@ -943,71 +946,46 @@ var Grapher = function() {
         var double = input.double;
         var tolerance = input.tolerance;
         var doubled = false;
-        function onTouch() {
-            element.on('touchend', listenTouch);
-            element.on('touchstart', function(e) {
-                down(e.originalEvent.touches[0]);
-            });
-            element.on('touchmove', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                move(e.originalEvent.touches[0]);
-            });
-        }
         function onClick() {
             element.on('mouseup', listenClick);
             element.on('mousedown', down);
             element.on('mousemove', move);
         }
-        function listenTouch(e) {
-            element.off('touchend touchstart touchmove');
-            doubled = false;
-            var click = setTimeout(function() {
-                if(!doubled)
-                    up();
-                doubled = false;
-                element.off('touchend');
-                on();
-            },tolerance);
-            element.on('touchend', function() {
-                clearTimeout(click);
-                double(e);
-                doubled = true;
-                element.off('touchend');
-                on();
-            });
-        }
         function listenClick(e) {
             element.off('mouseup mousedown mousemove');
             doubled = false;
             var click = setTimeout(function() {
+                console.log('click');
                 if(!doubled)
                     up();
                 doubled = false;
                 element.off('mouseup');
-                on();
+                onClick();
             },tolerance);
             element.on('mouseup', function() {
+                console.log('doubleclick');
                 clearTimeout(click);
-                double(e);
+                double(e, e.target);
                 doubled = true;
                 element.off('mouseup');
-                on();
+                onClick();
             });
         }
-        
-        function on() {
-            onTouch();
-            onClick();
-            element.on('mousedown', function(e) {
-                element.off('touchstart touchmove touchend');
-            });
-            element.on('touchstart', function(e) {
-                element.off('mousedown mousemove mouseup');
-            });
+        onClick();
+    }
+    
+    function fullscreen(yes) {
+        fullscreenMode = yes;
+        if(yes) {
+            try {root[0].mozRequestFullScreen();}
+            catch(e) {root[0].webkitRequestFullScreen();}
         }
-        
-        on();
+        else {
+            try {document.mozCancelFullScreen();}
+            catch(e) {document.webkitCancelFullScreen();}
+        }
+        root.find('#fullscreen').html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
+        resizeVisuals();
     }
     
     function speedIndicators(){
@@ -1048,6 +1026,11 @@ var Grapher = function() {
         return http.status!=404;
     }
     
+    function setFreePosition(free) {
+        freePosition = free;
+        $('#revertPos').css('visibility', free?'visible':'hidden');
+    }
+    
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
@@ -1077,10 +1060,14 @@ var Grapher = function() {
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "</audio>"
         + "</div>"
-        + "</div>";
+        + "</div>"
+        + "<div class='zoomRect'></div>";
     exports.initialize = function() {
         root=$('.pentimento');
         root.append(template);
+        zoomRect = root.find('.zoomRect');
+        sidecontrols = root.find('.sidecontrols');
+        controls = root.find('.controls');
         
         var filename=getURLParameter('n',location.search);
         var t=getURLParameter('t',location.search);
@@ -1149,20 +1136,14 @@ var Grapher = function() {
             },
             move: dragging,
             up: dragStop,
-            double: function(e) {
-                if(e.target === c) {
+            double: function(e, target) {
+                if(target === c) {
                     isDragging = false;
-                    var zoom = totalZoom===1?2:1;
-                    function animateZoom() {
-                        zoomStart();
-                        zooming('trash', {value: totalZoom<zoom?
-                                          parseInt(totalZoom*10+1)/10:
-                                          parseInt(totalZoom*10-1)/10});
-                        $('#zoomslider').slider('value', totalZoom);
-                        if(totalZoom !== zoom)
-                            setTimeout(animateZoom, 10);
-                    }
-                    animateZoom();
+                    var nz = totalZoom===1?2:1;
+                    //zoom in on center of visible portion achieved by extra translations
+                    var nx = translateX + (1-nz/totalZoom)*(c.width/2 + (e.pageX-offset.left-c.width/2)-translateX);
+                    var ny = translateY + (1-nz/totalZoom)*(c.height/2 + (e.pageY-offset.top-c.height/2)-translateY);
+                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
                 }
             },
             tolerance: 200
@@ -1171,7 +1152,7 @@ var Grapher = function() {
         c.addEventListener('mousewheel', function(e){
             e.preventDefault();
             e.stopPropagation();
-            freePosition = true;
+            setFreePosition(true);
             if(!dragToPan) {
                 var scroll = e.wheelDeltaY;
                 if(e.shiftKey)
@@ -1238,43 +1219,34 @@ var Grapher = function() {
             }
         });
         
-        $('.sidecontrols').append('<br><button id="revertPos">Revert</button>');
-        $('.sidecontrols').append('<br><button id="seeAll">See All</button>');
-        $('.sidecontrols').append('<br><button id="fullscreen">Fullscreen</button>');
-        $('.sidecontrols').append('<br><button id="touch">Touch</button>');
-        $('.sidecontrols').append('<br><br><textarea id="URLs" ' +
+        root.append('<button id="revertPos" style="visibility:hidden;"><img src="revert.png"></img></button>');
+        sidecontrols.append('<br><button id="seeAll">See All</button>');
+        sidecontrols.append('<br><button id="fullscreen">Fullscreen</button>');
+        sidecontrols.append('<br><button id="touch">Touch</button>');
+        sidecontrols.append('<br><br><textarea id="URLs" ' +
                                   'readonly="readonly" rows="3" '+
                                   'cols="8" wrap="soft"></textarea>');
-        $('.sidecontrols').append('<br><button id="timeStampURL">current URL</button>');
-        $('.sidecontrols').append('<br><button id="screenshotURL">screenshot</button>');
-        $('.sidecontrols').append('<br><br><input type="checkbox" name="captionsOption" value="captionsChoice" class="captionsOption">captions</input>');
+        sidecontrols.append('<br><button id="timeStampURL">current URL</button>');
+        sidecontrols.append('<br><button id="screenshotURL">screenshot</button>');
+        sidecontrols.append('<br><br><input type="checkbox" name="captionsOption" value="captionsChoice" class="captionsOption">captions</input>');
         
-        $('.sidecontrols').css('position', 'absolute');
+        sidecontrols.css('position', 'absolute');
         
         $('#revertPos').on('click', function () {
-            freePosition = false;
+            setFreePosition(false);
             var next = getTransform(audio.currentTime+0.5);
             freePosition = true;
-            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
                 freePosition = false;
             });
         });
         $('#seeAll').on('click', function() {
-            freePosition = true;
-            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, 0, 0, minZoom);
+            setFreePosition(true);
+            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, 0, 0, minZoom);
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
-            if(fullscreenMode) {
-                try {root[0].mozRequestFullScreen();}
-                catch(e) {root[0].webkitRequestFullScreen();}
-            }
-            else {
-                try {document.mozCancelFullScreen();}
-                catch(e) {document.webkitCancelFullScreen();}
-            }
-            $(this).html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
-            resizeVisuals();
+            fullscreen(fullscreenMode);
         });
         
         audio.addEventListener('play', start);
@@ -1319,23 +1291,23 @@ var Grapher = function() {
             }
         });
         
-        $('body').on('keypress',function(event){
-            if (event.keyCode==32){ // space was pressed
+        $(document).on('keyup',function(event){
+            var keyCode = event.keyCode || event.which;
+            console.log(keyCode);
+            if (keyCode===32){ // space was pressed
                 //trigger button click
                 root.find('.start').click();
             }
-            if (event.keyCode==102) {
-                freePosition = !freePosition;
-                if(!freePosition) { //animate to playing position if reverting from free
-                    var next = getTransform(audio.currentTime);
-                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11);
-                }
+            if (keyCode===27) { // esc was pressed
+                event.preventDefault();
+                event.stopPropagation();
+                fullscreen(false);
             }
         });
         
         console.log(localStorage);
         
-        if (localStorage[datafile]!=undefined){
+        if (localStorage[datafile]!='undefined'){
             var local=JSON.parse(localStorage[datafile]);
             currentI=local.currentTime;
             furthestpoint=local.furthestPoint;

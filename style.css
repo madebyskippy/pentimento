@@ -16,6 +16,19 @@ body{
     cursor: default;
 }
 
+.captions{
+    position:absolute;
+    margin-left:1px;
+    color: #fff;
+    text-shadow:
+        -1px -1px 0 #000,
+        1px -1px 0 #000,
+        -1px 1px 3px #000,
+        1px 1px 0 #000;
+    visibility:hidden;
+    text-align:center;
+}
+
 .controls{
     width:425px;
     height:60px;
@@ -33,7 +46,7 @@ input[type='button']{
     border:0px #fff solid;
     box-shadow:0;
     padding:0px;
-    background-color:#fff;
+    background-color:transparent;
     opacity: .5;
     background-repeat:no-repeat;
 }
@@ -112,14 +125,36 @@ input[type='button']:focus{
     width: 100px;
 }
 
+.buttons button{
+    background-repeat:no-repeat;
+    position:absolute;
+    opacity:.5;
+    border: 2px #fff solid;
+    background-color:transparent;
+}
+
+
+.buttons button:hover{
+    opacity:.7;
+}
+.buttons button:active{
+    opacity:1;
+}
+.buttons button:focus{
+    opacity:1;
+}
+
 .jumpBack{
+    background-image: url('slow.png');
     width:25px;
     margin:1px;
 }
 
 .jumpForward{
+    background-image: url('ff.png');
     width:25px;
     margin:1px;
+    margin-left:30px;
 }
 
 .onScreenStatus{
@@ -132,6 +167,7 @@ input[type='button']:focus{
     display:inline-block;
     margin-left:10px;
     padding: 10px;
+    font-size: 12px;
 }
 
 .zoomlabel{
@@ -162,7 +198,6 @@ input[type='button']:focus{
 .toggleControls{
     margin-top:20px;
     margin-bottom:10px;
-    font-size: 12px;
     width: 60px;
 }
 

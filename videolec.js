@@ -31,6 +31,8 @@ var Grapher = function() {
     var audio;
     var isAudio=true;
     
+    var isScreenshot=false; //true when you're getting a screenshot and don't want scroll bars
+    
     var furthestpoint=0; // furthest point in seconds
     
     var imax;	// maximum time value
@@ -309,7 +311,7 @@ var Grapher = function() {
         translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
-        if(audio.paused & totalZoom !== minZoom) {
+        if(audio.paused & totalZoom !== minZoom & !isScreenshot) {
             drawScrollBars(translateX, translateY, totalZoom);
         }
         
@@ -776,11 +778,12 @@ var Grapher = function() {
     }
     
     function fadeSign(nextImg){
+        $('.onScreenStatus').stop();
         $('.onScreenStatus').css('visibility',"visible");
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').animate({
             opacity: 0
-        },1000,function(){
+        },750,function(){
             $('.onScreenStatus').css('visibility',"hidden");
             $('.onScreenStatus').css('opacity',".5");
             $('#pauseIcon').attr('src',nextImg);
@@ -821,20 +824,28 @@ var Grapher = function() {
             vidWidth = $(window).width();
         $('.controls').css('width', vidWidth);
         
-        var buttonWidths=parseInt(vidWidth* 50 / 575);
-        if (buttonWidths > 50 ) buttonWidths=50;
-        $('.buttons').css('width', buttonWidths+75);
-        $('.start').css('width',buttonWidths);
-        $('.start').css('background-size',buttonWidths);
-        $('.jumpForward').css('width',buttonWidths/2-2);
-        $('.jumpBack').css('width',buttonWidths/2-2);
+        var bigButtonWidths=parseInt(vidWidth* 50 / 575);
+        var smallButtonWidths=parseInt(vidWidth* 30/575);
+        if (bigButtonWidths > 50 ) {
+            bigButtonWidths=50;
+            smallButtonWidths=30;
+        }
+        var totalButtonWidth=bigButtonWidths+smallButtonWidths*2+15;
+        $('.buttons').css('width', totalButtonWidth);
+        $('.start').css('width',bigButtonWidths);
+        $('.start').css('background-size',bigButtonWidths);
+        $('.buttons button').css('width',smallButtonWidths);
+        $('.buttons button').css('height',smallButtonWidths);
+        $('.buttons button').css('background-size',smallButtonWidths-4);
+        $('.buttons button').css('margin-top',smallButtonWidths/2-2);
+        $('.buttons button').css('border-radius',smallButtonWidths);
+        $('.jumpForward').css('margin-left',smallButtonWidths+4);
         
-        var timeControlWidth=parseInt(vidWidth)-buttonWidths-75;
+        var timeControlWidth=parseInt(vidWidth)-totalButtonWidth;
         $('.timeControls').css('width',timeControlWidth);
         $('#slider').css('width',timeControlWidth-150);
-        $('#slider').css('margin-top',buttonWidths/2-5);
-        $('.time').css('margin-top',buttonWidths/2-5);
-        $('#totalTime').css('margin-top',buttonWidths/2-5);
+        $('#slider').css('margin-top',bigButtonWidths/2-5);
+        $('#totalTime').css('margin-top',bigButtonWidths/2-5);
         
         if(fullscreenMode)
             $('.sidecontrols').css('height', $(window).height());
@@ -898,12 +909,16 @@ var Grapher = function() {
                                     top: ($('.video').offset().top+'px'),
                                     left: (($('.video').offset().left+
                                             $('.video').width()+10)+'px'),
-                                    'background-color':'none'});
+                                    'background-color':''});
             $('.controls').css({position: 'absolute',
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
-                                left: ($('.video').offset().left+'px')});
+                                left: ($('.video').offset().left+'px'),
+                                'background-color':''});
         }
+        
+        $('.captions').css('width',c.width);
+        $('.captions').css('top',$('.controls').offset().top - 50 + 'px');
         
         yscale=(c.height)/ymax;
         xscale=(c.width)/xmax;
@@ -995,6 +1010,31 @@ var Grapher = function() {
         on();
     }
     
+    function speedIndicators(){
+        console.log(audio.playbackRate);
+        if (audio.playbackRate>1){
+            $('.jumpForward').css('border-color','#0e9300');
+            $('.jumpForward').css('opacity','.7');
+            $('.jumpBack').css('border-color','');
+            $('.jumpBack').css('opacity','');
+        } else if (audio.playbackRate < 1 & audio.playbackRate > 0){
+            $('.jumpBack').css('border-color','#0e9300');
+            $('.jumpBack').css('opacity','.7');
+            $('.jumpForward').css('border-color','');
+            $('.jumpForward').css('opacity','');
+        } else if (audio.playbackRate < 0){
+            $('.jumpBack').css('border-color','#f44');
+            $('.jumpBack').css('opacity','.7');
+            $('.jumpForward').css('border-color','');
+            $('.jumpForward').css('opacity','');
+        } else {
+            $('.jumpBack').css('border-color','');
+            $('.jumpBack').css('opacity','');
+            $('.jumpForward').css('border-color','');
+            $('.jumpForward').css('opacity','');
+        }
+    }
+    
     function getURLParameter(name,data) {
         return decodeURI(
             (RegExp('[?|&]'+name + '=' + '(.+?)(&|$)').exec(data)||[,-100])[1]
@@ -1024,7 +1064,8 @@ var Grapher = function() {
         + "         <div id='toggleDrag'></div></div>"
         + " </div>"
         + "</div>"
-        + "<br> <div class='controls'>"
+        + "<br> <div class='captions'>test captions</div>"
+        + "<div class='controls'>"
         + " <div class='buttons'>"
         + "     <input class='start' type='button'/>"
         + " </div>"
@@ -1058,8 +1099,8 @@ var Grapher = function() {
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
         
-        $('.buttons').append('<button class="jumpBack"> < </button>');
-        $('.buttons').append('<button class="jumpForward"> > </button>');
+        $('.buttons').append('<button class="jumpBack"></button>');
+        $('.buttons').append('<button class="jumpForward"></button>');
         
         $('#slider').slider({
             max:100,
@@ -1156,10 +1197,13 @@ var Grapher = function() {
         
         root.find('.jumpForward').on('click', function() {
             audio.playbackRate += 0.1;
+            speedIndicators();
         });
         root.find('.jumpBack').on('click', function() {
             audio.playbackRate -= 0.1;
+            speedIndicators();
         });
+        
         root.find('#toggleDrag').slider({
             orientation: 'vertical',
             min: -1, max: 1, step: 2, value: 1,
@@ -1203,6 +1247,7 @@ var Grapher = function() {
                                   'cols="8" wrap="soft"></textarea>');
         $('.sidecontrols').append('<br><button id="timeStampURL">current URL</button>');
         $('.sidecontrols').append('<br><button id="screenshotURL">screenshot</button>');
+        $('.sidecontrols').append('<br><br><input type="checkbox" name="captionsOption" value="captionsChoice" class="captionsOption">captions</input>');
         
         $('.sidecontrols').css('position', 'absolute');
         
@@ -1240,14 +1285,26 @@ var Grapher = function() {
             $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
             doubleClick.toggle();
         });
+        
         $('#timeStampURL').on('click',function(){
             var url = window.location.origin + window.location.pathname
             url = url + '?n='+ getURLParameter('n',location.search);
             $('#URLs').val(url+'&t='+currentI);
         });
+        
         $('#screenshotURL').on('click',function(){
+            isScreenshot=true;
+            clearFrame();
+            oneFrame(currentI);
+            isScreenshot=false;
             var dataURL=c.toDataURL("image/png");
             window.open(dataURL);
+        });
+        
+        $('.captionsOption').on('click',function(){
+            if ($(this).is(':checked'))
+                $('.captions').css('visibility','visible');
+            else $('.captions').css('visibility','hidden');
         });
                 
         root.find('.start').on('click',function() {

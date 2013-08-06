@@ -1138,11 +1138,23 @@ var Grapher = function() {
             up: dragStop,
             double: function(e, target) {
                 if(target === c) {
+                    var x = e.pageX,
+                        y = e.pageY;
                     isDragging = false;
                     var nz = totalZoom===1?2:1;
-                    //zoom in on center of visible portion achieved by extra translations
-                    var nx = translateX + (1-nz/totalZoom)*(c.width/2 + (e.pageX-offset.left-c.width/2)-translateX);
-                    var ny = translateY + (1-nz/totalZoom)*(c.height/2 + (e.pageY-offset.top-c.height/2)-translateY);
+                    if(nz === 2) {
+                        previousX = x-c.width/2/nz;
+                        previousY = y-c.height/2/nz;
+                    }
+                    else {
+                        previousX = x>c.width/2?-c.width:0;
+                        previousY = y>c.height/2?-c.height:0;
+                    }
+                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
+                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
+                    nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
+                    ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
+                    
                     animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
                 }
             },

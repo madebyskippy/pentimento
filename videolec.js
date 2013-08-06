@@ -18,6 +18,7 @@ var Grapher = function() {
     var wasDragging = false; //true if currently paused and panning/zooming
     var dragToPan = true; //true if dragging to pan, false if dragging to zoom
     var zoomRectW = 0, zoomRectH = 0;
+    var zoomRect;
     var offset;
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     var fullscreenMode = false;
@@ -36,7 +37,7 @@ var Grapher = function() {
     var imax;	// maximum time value
     
     var currentI=0; //current index of time (in seconds)
-    var initialPause; //used in dragging 
+    var initialPause = true; //used in dragging 
         //(dragging pauses but unpauses if it was just a click)
     var draw;
     
@@ -368,12 +369,14 @@ var Grapher = function() {
         
         localStorage[datafile]=JSON.stringify(local);
         
-        var newTransform = getTransform(currentI);
-        totalZoom = newTransform.m11;
-        translateX = newTransform.tx;
-        translateY = newTransform.ty;
-        $('#zoomslider').slider('value', totalZoom);
-        displayZoom(totalZoom);
+        if(!freePosition) {
+            var newTransform = getTransform(currentI);
+            totalZoom = newTransform.m11;
+            translateX = newTransform.tx;
+            translateY = newTransform.ty;
+            $('#zoomslider').slider('value', totalZoom);
+            displayZoom(totalZoom);
+        }
         clearFrame();
         oneFrame(currentI);
 	}
@@ -595,6 +598,8 @@ var Grapher = function() {
         if(!audio.paused)
             freePosition = true;
         wasDragging = false;
+        if(!dragToPan)
+            zoomRect.css({visibility: 'visible', top: previousY, left: previousX});
     }
     
     //triggered when mouse dragged across canvas
@@ -621,13 +626,11 @@ var Grapher = function() {
                     clearFrame();
                     oneFrame(audio.currentTime);
                 }
+                zoomRect.css({width: zoomRectW, height: zoomRectH});
                 if(c.width/Math.abs(zoomRectW/totalZoom) < maxZoom)
-                    context.fillStyle = 'rgba(0,255,0,0.1)';
+                    zoomRect.css('background-color', 'rgba(0,255,0,0.1)');
                 else
-                    context.fillStyle = 'rgba(255,0,0,0.1)';
-                context.fillRect((previousX-offset.left-translateX)/totalZoom,
-                                 (previousY-offset.top-translateY)/totalZoom,
-                                 zoomRectW/totalZoom, zoomRectH/totalZoom);
+                    zoomRect.css('background-color', 'rgba(255,0,0,0.1)');
             }
         }
         
@@ -647,18 +650,18 @@ var Grapher = function() {
     function animateControls(show) {
         if(show) {
             console.log('show');
-            $('.controls').show();
+            $('.controls').css('visibility','visible');
             $('.controls').animate({opacity: 1},200);
-            $('.sidecontrols').show();
+            $('.sidecontrols').css('visibility','visible');
             $('.sidecontrols').animate({opacity: 1},200);
             controlsVisible = true;
         }
         else {
             console.log('hide');
             $('.controls').animate({opacity: 0},200);
-            setTimeout(function(){$('.controls').hide();},200);
+            setTimeout(function(){$('.controls').css('visibility','hidden');},200);
             $('.sidecontrols').animate({opacity: 0},200);
-            setTimeout(function(){$('.sidecontrols').hide();},200);
+            setTimeout(function(){$('.sidecontrols').css('visibility','hidden');},200);
             controlsVisible = false;
         }
     }
@@ -685,6 +688,7 @@ var Grapher = function() {
                 }
                 zoomRectW = 0;
                 zoomRectH = 0;
+                zoomRect.css({visibility: 'hidden', height: 0, width: 0});
             }
             
             if(!wasDragging) { // click
@@ -726,7 +730,7 @@ var Grapher = function() {
             
             setTimeout(function() {
                 animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback);
-            }, 10);
+            }, 50);
         }
     }
     
@@ -785,35 +789,6 @@ var Grapher = function() {
             $('.onScreenStatus').css('opacity',".5");
             $('#pauseIcon').attr('src',nextImg);
         });
-    }
-    
-    function jump(val){
-        var initialpause=paused;
-        pause();
-        paused=initialpause;
-        var time=currentI+val;
-        if (time > imax) time = parseInt(imax);
-        if (time < 0) time=0;
-        currentI=time;
-        offsetTime=time*1000;
-        setTime=true;
-            
-        var newTransform = getTransform(currentI);
-        totalZoom = newTransform.m11;
-        translateX = newTransform.tx;
-        translateY = newTransform.ty;
-        $('#zoomslider').slider('value', totalZoom);
-        displayZoom(totalZoom);
-        
-        clearFrame();
-        oneFrame(time);
-        changeSlider(time);
-        if (isAudio) audio.currentTime=time;
-        
-        if(!paused){ // if it wasn't paused, keep playing
-            paused=true; //it only starts if it was previously paused.
-            start();
-        }
     }
     
     function resizeControls(vidWidth){
@@ -898,11 +873,14 @@ var Grapher = function() {
                                     top: ($('.video').offset().top+'px'),
                                     left: (($('.video').offset().left+
                                             $('.video').width()+10)+'px'),
-                                    'background-color':'none'});
+                                    'background-color':'rgba(255,255,255,0)',
+                                    visibility: 'visible',opacity: 1});
             $('.controls').css({position: 'absolute',
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
-                                left: ($('.video').offset().left+'px')});
+                                left: ($('.video').offset().left+'px'),
+                                'background-color':'rgba(255,255,255,0)',
+                                visibility: 'visible',opacity: 1});
         }
         
         yscale=(c.height)/ymax;
@@ -920,6 +898,7 @@ var Grapher = function() {
     }
     
     //custom handler to distinguish between single- and double-click events
+    //TODO: test on actual touch device
     function doubleClickHandler(input) {
         var element = input.element;
         var down = input.down;
@@ -928,71 +907,46 @@ var Grapher = function() {
         var double = input.double;
         var tolerance = input.tolerance;
         var doubled = false;
-        function onTouch() {
-            element.on('touchend', listenTouch);
-            element.on('touchstart', function(e) {
-                down(e.originalEvent.touches[0]);
-            });
-            element.on('touchmove', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                move(e.originalEvent.touches[0]);
-            });
-        }
         function onClick() {
             element.on('mouseup', listenClick);
             element.on('mousedown', down);
             element.on('mousemove', move);
         }
-        function listenTouch(e) {
-            element.off('touchend touchstart touchmove');
-            doubled = false;
-            var click = setTimeout(function() {
-                if(!doubled)
-                    up();
-                doubled = false;
-                element.off('touchend');
-                on();
-            },tolerance);
-            element.on('touchend', function() {
-                clearTimeout(click);
-                double(e);
-                doubled = true;
-                element.off('touchend');
-                on();
-            });
-        }
         function listenClick(e) {
             element.off('mouseup mousedown mousemove');
             doubled = false;
             var click = setTimeout(function() {
+                console.log('click');
                 if(!doubled)
                     up();
                 doubled = false;
                 element.off('mouseup');
-                on();
+                onClick();
             },tolerance);
             element.on('mouseup', function() {
+                console.log('doubleclick');
                 clearTimeout(click);
-                double(e);
+                double(e, e.target);
                 doubled = true;
                 element.off('mouseup');
-                on();
+                onClick();
             });
         }
-        
-        function on() {
-            onTouch();
-            onClick();
-            element.on('mousedown', function(e) {
-                element.off('touchstart touchmove touchend');
-            });
-            element.on('touchstart', function(e) {
-                element.off('mousedown mousemove mouseup');
-            });
+        onClick();
+    }
+    
+    function fullscreen(yes) {
+        fullscreenMode = yes;
+        if(yes) {
+            try {root[0].mozRequestFullScreen();}
+            catch(e) {root[0].webkitRequestFullScreen();}
         }
-        
-        on();
+        else {
+            try {document.mozCancelFullScreen();}
+            catch(e) {document.webkitCancelFullScreen();}
+        }
+        root.find('#fullscreen').html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
+        resizeVisuals();
     }
     
     function getURLParameter(name,data) {
@@ -1036,10 +990,12 @@ var Grapher = function() {
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "</audio>"
         + "</div>"
-        + "</div>";
+        + "</div>"
+        + "<div class='zoomRect'></div>";
     exports.initialize = function() {
         root=$('.pentimento');
         root.append(template);
+        zoomRect = root.find('.zoomRect');
         
         var filename=getURLParameter('n',location.search);
         var t=getURLParameter('t',location.search);
@@ -1108,20 +1064,14 @@ var Grapher = function() {
             },
             move: dragging,
             up: dragStop,
-            double: function(e) {
-                if(e.target === c) {
+            double: function(e, target) {
+                if(target === c) {
                     isDragging = false;
-                    var zoom = totalZoom===1?2:1;
-                    function animateZoom() {
-                        zoomStart();
-                        zooming('trash', {value: totalZoom<zoom?
-                                          parseInt(totalZoom*10+1)/10:
-                                          parseInt(totalZoom*10-1)/10});
-                        $('#zoomslider').slider('value', totalZoom);
-                        if(totalZoom !== zoom)
-                            setTimeout(animateZoom, 10);
-                    }
-                    animateZoom();
+                    var nz = totalZoom===1?2:1;
+                    //zoom in on center of visible portion achieved by extra translations
+                    var nx = translateX + (1-nz/totalZoom)*(c.width/2 + (e.pageX-offset.left-c.width/2)-translateX);
+                    var ny = translateY + (1-nz/totalZoom)*(c.height/2 + (e.pageY-offset.top-c.height/2)-translateY);
+                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
                 }
             },
             tolerance: 200
@@ -1210,26 +1160,17 @@ var Grapher = function() {
             freePosition = false;
             var next = getTransform(audio.currentTime+0.5);
             freePosition = true;
-            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
                 freePosition = false;
             });
         });
         $('#seeAll').on('click', function() {
             freePosition = true;
-            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, 0, 0, minZoom);
+            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, 0, 0, minZoom);
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
-            if(fullscreenMode) {
-                try {root[0].mozRequestFullScreen();}
-                catch(e) {root[0].webkitRequestFullScreen();}
-            }
-            else {
-                try {document.mozCancelFullScreen();}
-                catch(e) {document.webkitCancelFullScreen();}
-            }
-            $(this).html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
-            resizeVisuals();
+            fullscreen(fullscreenMode);
         });
         
         audio.addEventListener('play', start);
@@ -1262,17 +1203,17 @@ var Grapher = function() {
             }
         });
         
-        $('body').on('keypress',function(event){
-            if (event.keyCode==32){ // space was pressed
+        $(document).on('keyup',function(event){
+            var keyCode = event.keyCode || event.which;
+            console.log(keyCode);
+            if (keyCode===32){ // space was pressed
                 //trigger button click
                 root.find('.start').click();
             }
-            if (event.keyCode==102) {
-                freePosition = !freePosition;
-                if(!freePosition) { //animate to playing position if reverting from free
-                    var next = getTransform(audio.currentTime);
-                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11);
-                }
+            if (keyCode===27) { // esc was pressed
+                event.preventDefault();
+                event.stopPropagation();
+                fullscreen(false);
             }
         });
         

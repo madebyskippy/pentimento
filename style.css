@@ -11,6 +11,12 @@ body{
     user-select: none;
 }
 
+.zoomRect {
+    position: absolute;
+    float: left;
+    visibility: hidden;
+}
+
 .video{
     border:1px solid #eee;
     cursor: default;

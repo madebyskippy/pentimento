@@ -23,6 +23,19 @@ body{
     background-color: '#fff';
 }
 
+.speedDisplay{
+    position:absolute;
+    color: #fff;
+    text-shadow:
+        -1px -1px 2px #000,
+        1px -1px 2px #000,
+        -1px 1px 2px #000,
+        1px 1px 2px #000;
+    width: 100px;
+    font-size: 30px;
+    padding-left:20px;
+}
+
 .captions{
     position:absolute;
     margin-left:1px;
@@ -76,7 +89,7 @@ input[type='button']:focus{
 }
 
 .timeControls{
-    float:right;
+    position:absolute;
     width:375px;
 }
 
@@ -140,7 +153,6 @@ input[type='button']:focus{
     background-color:transparent;
 }
 
-
 .buttons button:hover{
     opacity:.7;
 }
@@ -162,6 +174,29 @@ input[type='button']:focus{
     width:25px;
     margin:1px;
     margin-left:30px;
+}
+
+.volume{
+    background-image: url('vol.png');
+    width:30px;
+    height:30px;
+    background-size: 30px;
+    background-repeat:no-repeat;
+    border: 0;
+    background-color: transparent;
+    opacity: .7;
+    margin-right:5px;
+    float:right;
+}
+
+.volume:hover{
+    opacity: 1;
+}
+
+.volumeSlider{
+    visibility:hidden;
+    width:10px;
+    height:100px;
 }
 
 .onScreenStatus{

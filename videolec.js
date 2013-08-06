@@ -839,8 +839,21 @@ var Grapher = function() {
         $('.buttons button').css('border-radius',smallButtonWidths);
         $('.jumpForward').css('margin-left',smallButtonWidths+4);
         
-        var timeControlWidth=parseInt(vidWidth)-totalButtonWidth;
+        var volWidth= vidWidth * 30/575;
+        if (volWidth > 30) volWidth=30;
+        $('.volume').css('width',volWidth);
+        $('.volume').css('height',volWidth);
+        $('.volume').css('background-size',volWidth);
+        $('.volume').css('margin-top',bigButtonWidths/2 - volWidth/2);
+        $('.volumeSlider').position({
+            my: 'bottom',
+            at: 'top',
+            of: $('.volume'),
+        });
+        
+        var timeControlWidth=parseInt(vidWidth)-totalButtonWidth-volWidth-5;
         $('.timeControls').css('width',timeControlWidth);
+        $('.timeControls').css('margin-left',totalButtonWidth);
         $('#slider').css('width',timeControlWidth-150);
         $('#slider').css('margin-top',bigButtonWidths/2-5);
         $('#totalTime').css('margin-top',bigButtonWidths/2-5);
@@ -916,6 +929,10 @@ var Grapher = function() {
         
         $('.captions').css('width',c.width);
         $('.captions').css('top',$('.controls').offset().top - 50 + 'px');
+        $('.speedDisplay').css('top',$('.controls').offset().top - 45 + 'px');
+        var fontsize = c.width * 30/575;
+        if (fontsize > 30 ) fontsize=30;
+        $('.speedDisplay').css('font-size', fontsize+'px');
         
         yscale=(c.height)/ymax;
         xscale=(c.width)/xmax;
@@ -990,6 +1007,7 @@ var Grapher = function() {
     
     function speedIndicators(){
         console.log(audio.playbackRate);
+        $('.speedDisplay').text(Math.round(audio.playbackRate/1*10)/10 +" x");
         if (audio.playbackRate>1){
             $('.jumpForward').css('border-color','#0e9300');
             $('.jumpForward').css('opacity','.7');
@@ -1006,6 +1024,7 @@ var Grapher = function() {
             $('.jumpForward').css('border-color','');
             $('.jumpForward').css('opacity','');
         } else {
+            $('.speedDisplay').text("");
             $('.jumpBack').css('border-color','');
             $('.jumpBack').css('opacity','');
             $('.jumpForward').css('border-color','');
@@ -1056,6 +1075,7 @@ var Grapher = function() {
         + "     <div id='slider'></div>"
         + "     <div id='totalTime'></div>"
         + " </div>"
+        + " <button class='volume'></button>"
         + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "</audio>"
@@ -1085,9 +1105,25 @@ var Grapher = function() {
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
+        root.append('<div class="volumeSlider"></div>');
+        
+        $('.volumeSlider').slider({
+            max:1,
+            min:0,
+            step:.2,
+            orientation: 'vertical'
+        });
+        
+        $('.volume').on('click',function(){
+            if ( $('.volumeSlider').css('visibility') == 'visible')
+                $('.volumeSlider').css('visibility','hidden');
+            else 
+                $('.volumeSlider').css('visibility','visible');
+        });
         
         $('.buttons').append('<button class="jumpBack"></button>');
         $('.buttons').append('<button class="jumpForward"></button>');
+        $('.controls').append('<div class="speedDisplay"></div>');
         
         $('#slider').slider({
             max:100,

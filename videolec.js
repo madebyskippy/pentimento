@@ -932,10 +932,13 @@ var Grapher = function() {
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        $('#revertPos').css({top: offset.top+10,
-                             left: (offset.left+c.width-100*xscale-20),
-                             height:(100*yscale),
-                             width:(100*xscale)});
+        $('.bigTransBtns').css({height:(100*yscale),
+                                width:(100*xscale),
+                                left:(offset.left+c.width+20)});
+        $('#revertPos').css({top: (offset.top+10)});
+        $('#seeAll').css({top: (offset.top+c.height/4+10)});
+        $('#fullscreen').css({top: (offset.top+c.height/2+10)});
+        $('#screenshotURL').css({top: (offset.top+3*c.height/4+10)});
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -948,13 +951,35 @@ var Grapher = function() {
         var double = input.double;
         var tolerance = input.tolerance;
         var doubled = false;
+        function offClick() {
+            element.off('mouseup mousedown mousemove');
+        }
+        function offTap() {
+            element.off('touchstart touchmove touchend');
+        }
         function onClick() {
             element.on('mouseup', listenClick);
             element.on('mousedown', down);
             element.on('mousemove', move);
         }
+        function on() {
+            setTimeout(onClick,tolerance*4);
+            element.on('touchstart', function(e) {
+                offClick();
+                down(e.originalEvent.touches[0]);
+            });
+            element.on('touchmove', function(e) {
+                offClick();
+                move(e.originalEvent.touches[0]);
+            });
+            element.on('touchend', function(e) {
+                offClick();
+                listenTap(e);
+                setTimeout(onClick,tolerance*4);
+            });
+        }
         function listenClick(e) {
-            element.off('mouseup mousedown mousemove');
+            offClick();
             doubled = false;
             var click = setTimeout(function() {
                 console.log('click');
@@ -962,7 +987,7 @@ var Grapher = function() {
                     up();
                 doubled = false;
                 element.off('mouseup');
-                onClick();
+                on();
             },tolerance);
             element.on('mouseup', function() {
                 console.log('doubleclick');
@@ -970,10 +995,32 @@ var Grapher = function() {
                 double(e, e.target);
                 doubled = true;
                 element.off('mouseup');
-                onClick();
+                on();
             });
         }
-        onClick();
+        function listenTap(e) {
+            offTap();
+            doubled = false;
+            var tap = setTimeout(function() {
+                offClick();
+                console.log('click');
+                if(!doubled)
+                    up();
+                doubled = false;
+                element.off('touchend');
+                on();
+            },tolerance);
+            element.on('touchend', function() {
+                offClick();
+                console.log('doubleclick');
+                clearTimeout(tap);
+                double(e.originalEvent.changedTouches[0], e.target);
+                doubled = true;
+                element.off('touchend');
+                on();
+            });
+        }
+        on();
     }
     
     function fullscreen(yes) {
@@ -986,7 +1033,8 @@ var Grapher = function() {
             try {document.mozCancelFullScreen();}
             catch(e) {document.webkitCancelFullScreen();}
         }
-        root.find('#fullscreen').html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
+        root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
+        root.find('#fullscreen').attr('title', 'Exit Fullscreen');
         resizeVisuals();
     }
     
@@ -1030,7 +1078,7 @@ var Grapher = function() {
     
     function setFreePosition(free) {
         freePosition = free;
-        $('#revertPos').css('visibility', free?'visible':'hidden');
+//        $('#revertPos').css('visibility', free?'visible':'hidden');
     }
     
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
@@ -1138,6 +1186,8 @@ var Grapher = function() {
             up: dragStop,
             double: function(e, target) {
                 if(target === c) {
+                    setFreePosition(true);
+                    
                     var x = e.pageX,
                         y = e.pageY;
                     isDragging = false;
@@ -1231,15 +1281,15 @@ var Grapher = function() {
             }
         });
         
-        root.append('<button id="revertPos" style="visibility:hidden;"><img src="revert.png"></img></button>');
-        sidecontrols.append('<br><button id="seeAll">See All</button>');
-        sidecontrols.append('<br><button id="fullscreen">Fullscreen</button>');
-        sidecontrols.append('<br><button id="touch">Touch</button>');
+        root.append('<button class="bigTransBtns" id="revertPos" title="Lecture View"><img src="revert.png">Revert</img></button>');
+        root.append('<button class="bigTransBtns" id="seeAll" title="Big Board View"><img src="seeall.png">See All</img></button>');
+        root.append('<button class="bigTransBtns" id="fullscreen" title="Fullscreen"><img src="fs.png">Fullscreen</img></button>');
+        root.append('<button class="bigTransBtns" id="screenshotURL" title="Screenshot"><img src="camera.png">Screenshot</img></button>');
         sidecontrols.append('<br><br><textarea id="URLs" ' +
                                   'readonly="readonly" rows="3" '+
                                   'cols="8" wrap="soft"></textarea>');
         sidecontrols.append('<br><button id="timeStampURL">current URL</button>');
-        sidecontrols.append('<br><button id="screenshotURL">screenshot</button>');
+//        sidecontrols.append('<br><button id="screenshotURL">screenshot</button>');
         sidecontrols.append('<br><br><input type="checkbox" name="captionsOption" value="captionsChoice" class="captionsOption">captions</input>');
         
         sidecontrols.css('position', 'absolute');
@@ -1265,11 +1315,6 @@ var Grapher = function() {
         audio.addEventListener('pause', pause);
         audio.addEventListener('ended', stop);
         
-        $('#touch').on('click', function() {
-            $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
-            doubleClick.toggle();
-        });
-        
         $('#timeStampURL').on('click',function(){
             var url = window.location.origin + window.location.pathname
             url = url + '?n='+ getURLParameter('n',location.search);
@@ -1283,6 +1328,7 @@ var Grapher = function() {
             isScreenshot=false;
             var dataURL=c.toDataURL("image/png");
             window.open(dataURL);
+            fullscreen(false);
         });
         
         $('.captionsOption').on('click',function(){

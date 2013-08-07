@@ -275,12 +275,16 @@ var Grapher = function() {
             if(!freePosition) {
                 var newTransform = getTransform(currentI);
                 freePosition = true;
-                animateToPos(Date.now(), 200, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
+                animateToPos(Date.now(), 500, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
                     $('#zoomslider').slider('value', totalZoom);
                     displayZoom(totalZoom);
                     changeSlider(time);
                     freePosition = false;
                 });
+            }
+            else if(audio.paused) {
+                clearFrame();
+                oneFrame(currentI);
             }
         }
     }
@@ -705,7 +709,7 @@ var Grapher = function() {
                     var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
                     nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
                     ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
-                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
+                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
                 }
                 else if(audio.paused) {
                     clearFrame();
@@ -730,9 +734,9 @@ var Grapher = function() {
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
         ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
         
-        var interpolatedTime = (Date.now() - startTime)/duration;
+        var interpolatedTime = Math.pow((Date.now() - startTime)/duration-1,5)+1;
         
-        if(interpolatedTime > 1 | (tx === nx & ty === ny & tz === nz)) {
+        if(Date.now()-startTime > duration | (tx === nx & ty === ny & tz === nz)) {
             animating = false;
             translateX = nx, translateY = ny, totalZoom = nz;
             $('#zoomslider').slider('value',nz);
@@ -932,13 +936,19 @@ var Grapher = function() {
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        $('.bigTransBtns').css({height:(100*yscale),
+        var sideIncrement = c.height/9;
+        $('.big.transBtns').css({height:(100*yscale),
                                 width:(100*xscale),
                                 left:(offset.left+c.width+20)});
-        $('#revertPos').css({top: (offset.top+10)});
-        $('#seeAll').css({top: (offset.top+c.height/4+10)});
-        $('#fullscreen').css({top: (offset.top+c.height/2+10)});
-        $('#screenshotURL').css({top: (offset.top+3*c.height/4+10)});
+        $('#revertPos').css({top: (offset.top)});
+        $('#seeAll').css({top: (offset.top+2*sideIncrement)});
+        $('#fullscreen').css({top: (offset.top+4*sideIncrement)});
+        $('#screenshotURL').css({top: (offset.top+6*sideIncrement)});
+        $('.small.transBtns').css({top:(offset.top+8*sideIncrement),
+                                   height:(45*yscale),
+                                   width:(45*xscale)});
+        $('#zoomIn').css({left: (offset.left+c.width+20)});
+        $('#zoomOut').css({left: (offset.left+c.width+20+55*xscale)});
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -1081,6 +1091,13 @@ var Grapher = function() {
 //        $('#revertPos').css('visibility', free?'visible':'hidden');
     }
     
+    function animateZoom(nz) {
+        var nx = translateX + (1-nz/totalZoom)*(c.width/2-translateX);
+        var ny = translateY + (1-nz/totalZoom)*(c.height/2-translateY);
+        setFreePosition(true);
+        animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
+    }
+    
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
@@ -1117,6 +1134,7 @@ var Grapher = function() {
         root.append(template);
         zoomRect = root.find('.zoomRect');
         sidecontrols = root.find('.sidecontrols');
+        sidecontrols.hide();
         controls = root.find('.controls');
         
         var filename=getURLParameter('n',location.search);
@@ -1205,7 +1223,7 @@ var Grapher = function() {
                     nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
                     ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
                     
-                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
+                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
                 }
             },
             tolerance: 200
@@ -1281,15 +1299,16 @@ var Grapher = function() {
             }
         });
         
-        root.append('<button class="bigTransBtns" id="revertPos" title="Lecture View"><img src="revert.png">Revert</img></button>');
-        root.append('<button class="bigTransBtns" id="seeAll" title="Big Board View"><img src="seeall.png">See All</img></button>');
-        root.append('<button class="bigTransBtns" id="fullscreen" title="Fullscreen"><img src="fs.png">Fullscreen</img></button>');
-        root.append('<button class="bigTransBtns" id="screenshotURL" title="Screenshot"><img src="camera.png">Screenshot</img></button>');
+        root.append('<button class="big transBtns" id="revertPos" title="Lecture View"><img src="revert.png">Revert</img></button>');
+        root.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png">See All</img></button>');
+        root.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png">Fullscreen</img></button>');
+        root.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png">Screenshot</img></button>');
+        root.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png">Zoom In</img></button>');
+        root.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png">Zoom Out</img></button>');
         sidecontrols.append('<br><br><textarea id="URLs" ' +
                                   'readonly="readonly" rows="3" '+
                                   'cols="8" wrap="soft"></textarea>');
         sidecontrols.append('<br><button id="timeStampURL">current URL</button>');
-//        sidecontrols.append('<br><button id="screenshotURL">screenshot</button>');
         sidecontrols.append('<br><br><input type="checkbox" name="captionsOption" value="captionsChoice" class="captionsOption">captions</input>');
         
         sidecontrols.css('position', 'absolute');
@@ -1298,17 +1317,23 @@ var Grapher = function() {
             setFreePosition(false);
             var next = getTransform(audio.currentTime+0.5);
             freePosition = true;
-            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
                 freePosition = false;
             });
         });
         $('#seeAll').on('click', function() {
             setFreePosition(true);
-            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, 0, 0, minZoom);
+            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, 0, 0, minZoom);
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
             fullscreen(fullscreenMode);
+        });
+        $('#zoomIn').on('click', function() {
+            animateZoom(totalZoom*2);
+        });
+        $('#zoomOut').on('click', function() {
+            animateZoom(totalZoom/2);
         });
         
         audio.addEventListener('play', start);
@@ -1340,7 +1365,7 @@ var Grapher = function() {
         root.find('.start').on('click',function() {
             if(audio.paused) {
                 var next = getTransform(audio.currentTime);
-                animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+                animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
                     audio.play();
                 });
             }

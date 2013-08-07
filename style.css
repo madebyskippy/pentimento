@@ -235,17 +235,17 @@ input[type='button']:focus{
     color: #000;
 }
 
-.bigTransBtns{
+.transBtns{
     position:absolute;
     background-color: rgba(255,255,255,0);
     border-width: 0;
     padding: 0;
     opacity: 0.5;
 }
-.bigTransBtns img{
+.transBtns img{
     height:100%;
     width:100%;
 }
-.bigTransBtns:hover{
+.transBtns:hover{
     opacity: 1;
 }

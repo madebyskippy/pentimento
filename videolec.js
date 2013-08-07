@@ -853,8 +853,8 @@ var Grapher = function() {
         $('.volume').css('background-size',volWidth);
         $('.volume').css('margin-top',bigButtonWidths/2 - volWidth/2);
         $('.volumeSlider').position({
-            my: 'bottom',
-            at: 'top',
+            my: 'center bottom',
+            at: 'center top-10',
             of: $('.volume'),
         });
         
@@ -936,7 +936,7 @@ var Grapher = function() {
         
         $('.captions').css('width',c.width);
         $('.captions').css('top',$('.controls').offset().top - 50 + 'px');
-        $('.speedDisplay').css('top',$('.controls').offset().top - 45 + 'px');
+        $('.speedDisplay').css('top', -45 + 'px');
         var fontsize = c.width * 30/575;
         if (fontsize > 30 ) fontsize=30;
         $('.speedDisplay').css('font-size', fontsize+'px');
@@ -1176,12 +1176,17 @@ var Grapher = function() {
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
         root.append('<div class="volumeSlider"></div>');
+        audio.volume=.5;
         
         $('.volumeSlider').slider({
             max:1,
             min:0,
-            step:.2,
-            orientation: 'vertical'
+            step:.1,
+            value:audio.volume,
+            orientation: 'vertical',
+            range: "min",
+            slide: function(event, ui){
+                audio.volume=ui.value;},
         });
         
         $('.volume').on('click',function(){

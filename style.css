@@ -197,6 +197,13 @@ input[type='button']:focus{
     visibility:hidden;
     width:10px;
     height:100px;
+    margin-bottom:10px;
+}
+
+.volumeSlider .ui-slider-handle{
+    height:.5em;
+    margin-bottom:-.25em;
+    
 }
 
 .onScreenStatus{

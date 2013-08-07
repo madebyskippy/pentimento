@@ -236,42 +236,15 @@ input[type='button']:focus{
 }
 
 #toggleDrag{
-    margin-top: 10px;
-    margin-bottom: 10px;
-    height: 20px;
+    width: 20px;
+    height:10px;
 }
 
-.toggleControls{
-    margin-top:20px;
-    margin-bottom:10px;
-    width: 60px;
-}
-
-.toggleControls .left{
-    margin-top:3px;
-    float: left;
-    width: 50%;
-}
-
-.toggleControls .right{
-    float:right;
-    width:40%;
-    margin-left:10%;
-    color: #aaa;
-}
-
-.toggleControls .right .labels{
-    position:absolute;
-    margin-left:17px;
-}
-
-.labels#zoom{
-    margin-top: 23px;
-}
-
-.labels#pan{
-    margin-top:3px;
-    color: #000;
+#toggleDrag .ui-slider-handle{
+    height:10px;
+    width:10px;
+    margin-top:5px;
+    margin-left:-5px;
 }
 
 .transBtns{

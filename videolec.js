@@ -1121,13 +1121,6 @@ var Grapher = function() {
         + "     <div id='zoomslider'></div>"
         + "     <span class='zoomlabel' style='margin-top: -20px;'>-</span>"
         + "     <div id='zoomlabel'>1</div> </div>"
-        + " <div class='toggleControls'>"
-        + "     <div class='left'>drag: </div>"
-        + "     <div class='right'>"
-        + "         <div class='labels' id='pan'>pan</div>"
-        + "         <div class='labels' id='zoom'>zoom</div>"
-        + "         <div id='toggleDrag'></div></div>"
-        + " </div>"
         + "</div>"
         + "<br> <div class='captions'>test captions</div>"
         + "<div class='controls'>"
@@ -1195,6 +1188,8 @@ var Grapher = function() {
                 $('.volume').css('background-image','url("mute.png")');
             }
         });
+        
+        $('.controls').append('<div class="toggleControls">Drag To: <span id="pan">Pan</span><div id="toggleDrag"></div><span id="zoom">Zoom</span></div>');
         
         $('.buttons').append('<button class="jumpBack"></button>');
         $('.buttons').append('<button class="jumpForward"></button>');
@@ -1307,17 +1302,16 @@ var Grapher = function() {
         });
         
         root.find('#toggleDrag').slider({
-            orientation: 'vertical',
             min: -1, max: 1, step: 2, value: 1,
             slide: function(e, ui) {
                 dragToPan = ui.value > 0;
                 //true if dragging to pan
                 if (dragToPan) {
-                    $('.labels#pan').css('color','#000');
-                    $('.labels#zoom').css('color','#aaa');
+                    $('.toggleControls #pan').css('color','#000');
+                    $('.toggleControls #zoom').css('color','#aaa');
                 } else{
-                    $('.labels#pan').css('color','#aaa');
-                    $('.labels#zoom').css('color','#000');
+                    $('.toggleControls #pan').css('color','#aaa');
+                    $('.toggleControls #zoom').css('color','#000');
                 }
             }
         });

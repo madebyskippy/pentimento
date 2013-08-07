@@ -277,17 +277,17 @@ input[type='button']:focus{
     color: #000;
 }
 
-#revertPos{
+.transBtns{
     position:absolute;
     background-color: rgba(255,255,255,0);
     border-width: 0;
     padding: 0;
-    opacity: 0.3;
+    opacity: 0.5;
 }
-#revertPos img{
+.transBtns img{
     height:100%;
     width:100%;
 }
-#revertPos:hover{
-    opacity: 0.8;
+.transBtns:hover{
+    opacity: 1;
 }

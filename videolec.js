@@ -275,12 +275,16 @@ var Grapher = function() {
             if(!freePosition) {
                 var newTransform = getTransform(currentI);
                 freePosition = true;
-                animateToPos(Date.now(), 200, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
+                animateToPos(Date.now(), 500, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
                     $('#zoomslider').slider('value', totalZoom);
                     displayZoom(totalZoom);
                     changeSlider(time);
                     freePosition = false;
                 });
+            }
+            else if(audio.paused) {
+                clearFrame();
+                oneFrame(currentI);
             }
         }
     }
@@ -288,13 +292,14 @@ var Grapher = function() {
     function drawScrollBars(tx, ty, z) {
         context.beginPath();
         context.strokeStyle = 'rgba(0,0,0,0.3)';
+        context.lineCap = 'round';
         context.lineWidth = 8;
+        scrollBarLeft = (-tx-boundingRect.xmin*xscale*z)/(boundingRect.width*xscale*z)*c.width+10;
+        scrollBarTop = (-ty-boundingRect.ymin*yscale*z)/(boundingRect.height*yscale*z)*c.height+10;
         scrollBarWidth = xmax/boundingRect.width/z*c.width-20;
-        scrollBarLeft = (-tx-boundingRect.xmin*xscale)/boundingRect.width/xscale/z*c.width+10;
+        scrollBarHeight = ymax/boundingRect.height/z*c.height-20;
         context.moveTo(scrollBarLeft, c.height-10);
         context.lineTo(scrollBarLeft+scrollBarWidth, c.height-10);
-        scrollBarHeight = ymax/boundingRect.height/z*c.height-20;
-        scrollBarTop = (-ty-boundingRect.ymin*yscale)/boundingRect.height/yscale/z*c.height+10;
         context.moveTo(c.width-10, scrollBarTop);
         context.lineTo(c.width-10, scrollBarTop+scrollBarHeight);
         context.stroke();
@@ -303,8 +308,9 @@ var Grapher = function() {
     function drawBox(tx, ty, z) {
         context.beginPath();
         context.strokeStyle = 'rgba(0,0,255,0.2)';
+        context.lineCap = 'butt';
         context.lineWidth = 5/z;
-        context.setLineDash([5,2]);
+        context.setLineDash([8,5]);
         var width = xmax*xscale/z;
         var height = ymax*yscale/z;
         context.moveTo(-tx, -ty);
@@ -321,8 +327,8 @@ var Grapher = function() {
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, c.width, c.height);
         
-        translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale);
-        translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale);
+        translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale*totalZoom);
+        translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
         if((audio.paused | freePosition) & totalZoom !== minZoom & !isScreenshot) {
@@ -703,7 +709,7 @@ var Grapher = function() {
                     var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
                     nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
                     ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
-                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
+                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
                 }
                 else if(audio.paused) {
                     clearFrame();
@@ -728,9 +734,9 @@ var Grapher = function() {
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
         ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
         
-        var interpolatedTime = (Date.now() - startTime)/duration;
+        var interpolatedTime = Math.pow((Date.now() - startTime)/duration-1,5)+1;
         
-        if(interpolatedTime > 1 | (tx === nx & ty === ny & tz === nz)) {
+        if(Date.now()-startTime > duration | (tx === nx & ty === ny & tz === nz)) {
             animating = false;
             translateX = nx, translateY = ny, totalZoom = nz;
             $('#zoomslider').slider('value',nz);
@@ -947,10 +953,19 @@ var Grapher = function() {
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        $('#revertPos').css({top: offset.top+10,
-                             left: (offset.left+c.width-100*xscale-20),
-                             height:(100*yscale),
-                             width:(100*xscale)});
+        var sideIncrement = c.height/9;
+        $('.big.transBtns').css({height:(100*yscale),
+                                width:(100*xscale),
+                                left:(offset.left+c.width+20)});
+        $('#revertPos').css({top: (offset.top)});
+        $('#seeAll').css({top: (offset.top+2*sideIncrement)});
+        $('#fullscreen').css({top: (offset.top+4*sideIncrement)});
+        $('#screenshotURL').css({top: (offset.top+6*sideIncrement)});
+        $('.small.transBtns').css({top:(offset.top+8*sideIncrement),
+                                   height:(45*yscale),
+                                   width:(45*xscale)});
+        $('#zoomIn').css({left: (offset.left+c.width+20)});
+        $('#zoomOut').css({left: (offset.left+c.width+20+55*xscale)});
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -963,13 +978,35 @@ var Grapher = function() {
         var double = input.double;
         var tolerance = input.tolerance;
         var doubled = false;
+        function offClick() {
+            element.off('mouseup mousedown mousemove');
+        }
+        function offTap() {
+            element.off('touchstart touchmove touchend');
+        }
         function onClick() {
             element.on('mouseup', listenClick);
             element.on('mousedown', down);
             element.on('mousemove', move);
         }
+        function on() {
+            setTimeout(onClick,tolerance*4);
+            element.on('touchstart', function(e) {
+                offClick();
+                down(e.originalEvent.touches[0]);
+            });
+            element.on('touchmove', function(e) {
+                offClick();
+                move(e.originalEvent.touches[0]);
+            });
+            element.on('touchend', function(e) {
+                offClick();
+                listenTap(e);
+                setTimeout(onClick,tolerance*4);
+            });
+        }
         function listenClick(e) {
-            element.off('mouseup mousedown mousemove');
+            offClick();
             doubled = false;
             var click = setTimeout(function() {
                 console.log('click');
@@ -977,7 +1014,7 @@ var Grapher = function() {
                     up();
                 doubled = false;
                 element.off('mouseup');
-                onClick();
+                on();
             },tolerance);
             element.on('mouseup', function() {
                 console.log('doubleclick');
@@ -985,10 +1022,32 @@ var Grapher = function() {
                 double(e, e.target);
                 doubled = true;
                 element.off('mouseup');
-                onClick();
+                on();
             });
         }
-        onClick();
+        function listenTap(e) {
+            offTap();
+            doubled = false;
+            var tap = setTimeout(function() {
+                offClick();
+                console.log('click');
+                if(!doubled)
+                    up();
+                doubled = false;
+                element.off('touchend');
+                on();
+            },tolerance);
+            element.on('touchend', function() {
+                offClick();
+                console.log('doubleclick');
+                clearTimeout(tap);
+                double(e.originalEvent.changedTouches[0], e.target);
+                doubled = true;
+                element.off('touchend');
+                on();
+            });
+        }
+        on();
     }
     
     function fullscreen(yes) {
@@ -1001,7 +1060,8 @@ var Grapher = function() {
             try {document.mozCancelFullScreen();}
             catch(e) {document.webkitCancelFullScreen();}
         }
-        root.find('#fullscreen').html(fullscreenMode?"Exit Fullscreen":"Fullscreen");
+        root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
+        root.find('#fullscreen').attr('title', 'Exit Fullscreen');
         resizeVisuals();
     }
     
@@ -1047,7 +1107,14 @@ var Grapher = function() {
     
     function setFreePosition(free) {
         freePosition = free;
-        $('#revertPos').css('visibility', free?'visible':'hidden');
+//        $('#revertPos').css('visibility', free?'visible':'hidden');
+    }
+    
+    function animateZoom(nz) {
+        var nx = translateX + (1-nz/totalZoom)*(c.width/2-translateX);
+        var ny = translateY + (1-nz/totalZoom)*(c.height/2-translateY);
+        setFreePosition(true);
+        animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
     }
     
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
@@ -1087,6 +1154,7 @@ var Grapher = function() {
         root.append(template);
         zoomRect = root.find('.zoomRect');
         sidecontrols = root.find('.sidecontrols');
+        sidecontrols.hide();
         controls = root.find('.controls');
         
         var filename=getURLParameter('n',location.search);
@@ -1166,8 +1234,6 @@ var Grapher = function() {
         c=root.find('.video')[0];
         
         context=c.getContext('2d');
-		context.strokeStyle='black';
-		context.lineCap='round';
         
         var doubleClick = doubleClickHandler({
             element: $(window),
@@ -1179,12 +1245,26 @@ var Grapher = function() {
             up: dragStop,
             double: function(e, target) {
                 if(target === c) {
+                    setFreePosition(true);
+                    
+                    var x = e.pageX,
+                        y = e.pageY;
                     isDragging = false;
                     var nz = totalZoom===1?2:1;
-                    //zoom in on center of visible portion achieved by extra translations
-                    var nx = translateX + (1-nz/totalZoom)*(c.width/2 + (e.pageX-offset.left-c.width/2)-translateX);
-                    var ny = translateY + (1-nz/totalZoom)*(c.height/2 + (e.pageY-offset.top-c.height/2)-translateY);
-                    animateToPos(Date.now(), 200, translateX, translateY, totalZoom, nx, ny, nz);
+                    if(nz === 2) {
+                        previousX = x-c.width/2/nz;
+                        previousY = y-c.height/2/nz;
+                    }
+                    else {
+                        previousX = x>c.width/2?-c.width:0;
+                        previousY = y>c.height/2?-c.height:0;
+                    }
+                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
+                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
+                    nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
+                    ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
+                    
+                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
                 }
             },
             tolerance: 200
@@ -1260,15 +1340,16 @@ var Grapher = function() {
             }
         });
         
-        root.append('<button id="revertPos" style="visibility:hidden;"><img src="revert.png"></img></button>');
-        sidecontrols.append('<br><button id="seeAll">See All</button>');
-        sidecontrols.append('<br><button id="fullscreen">Fullscreen</button>');
-        sidecontrols.append('<br><button id="touch">Touch</button>');
+        root.append('<button class="big transBtns" id="revertPos" title="Lecture View"><img src="revert.png">Revert</img></button>');
+        root.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png">See All</img></button>');
+        root.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png">Fullscreen</img></button>');
+        root.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png">Screenshot</img></button>');
+        root.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png">Zoom In</img></button>');
+        root.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png">Zoom Out</img></button>');
         sidecontrols.append('<br><br><textarea id="URLs" ' +
                                   'readonly="readonly" rows="3" '+
                                   'cols="8" wrap="soft"></textarea>');
         sidecontrols.append('<br><button id="timeStampURL">current URL</button>');
-        sidecontrols.append('<br><button id="screenshotURL">screenshot</button>');
         sidecontrols.append('<br><br><input type="checkbox" name="captionsOption" value="captionsChoice" class="captionsOption">captions</input>');
         
         sidecontrols.css('position', 'absolute');
@@ -1277,27 +1358,28 @@ var Grapher = function() {
             setFreePosition(false);
             var next = getTransform(audio.currentTime+0.5);
             freePosition = true;
-            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
                 freePosition = false;
             });
         });
         $('#seeAll').on('click', function() {
             setFreePosition(true);
-            animateToPos(Date.now(), 200, translateX, translateY, totalZoom, 0, 0, minZoom);
+            animateToPos(Date.now(), 500, translateX, translateY, totalZoom, 0, 0, minZoom);
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
             fullscreen(fullscreenMode);
         });
+        $('#zoomIn').on('click', function() {
+            animateZoom(totalZoom*2);
+        });
+        $('#zoomOut').on('click', function() {
+            animateZoom(totalZoom/2);
+        });
         
         audio.addEventListener('play', start);
         audio.addEventListener('pause', pause);
         audio.addEventListener('ended', stop);
-        
-        $('#touch').on('click', function() {
-            $(this).html($(this).html()==="Touch"?"Mouse":"Touch");
-            doubleClick.toggle();
-        });
         
         $('#timeStampURL').on('click',function(){
             var url = window.location.origin + window.location.pathname
@@ -1312,6 +1394,7 @@ var Grapher = function() {
             isScreenshot=false;
             var dataURL=c.toDataURL("image/png");
             window.open(dataURL);
+            fullscreen(false);
         });
         
         $('.captionsOption').on('click',function(){
@@ -1323,7 +1406,7 @@ var Grapher = function() {
         root.find('.start').on('click',function() {
             if(audio.paused) {
                 var next = getTransform(audio.currentTime);
-                animateToPos(Date.now(), 200, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+                animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
                     audio.play();
                 });
             }

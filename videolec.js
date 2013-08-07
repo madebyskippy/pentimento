@@ -1197,15 +1197,15 @@ var Grapher = function() {
         });
         
         $('.volume').on('mouseover',function(){
-            var initialWidth=$('.volumeSlider').css('width');
-            if ( $('.volumeSlider').css('visibility') == 'visible')
-                $('.volumeSlider').css('visibility','hidden');
-            else 
-                $('.volumeSlider').css('visibility','visible');
-            $('.volumeSlider').css('width','0px');
-            $('.volumeSlider').animate({
-                width: initialWidth
-            },100);
+//            var initialWidth=$('.volumeSlider').css('width');
+//            if ( $('.volumeSlider').css('visibility') == 'visible')
+//                $('.volumeSlider').css('visibility','hidden');
+//            else 
+//                $('.volumeSlider').css('visibility','visible');
+//            $('.volumeSlider').css('width','0px');
+//            $('.volumeSlider').animate({
+//                width: initialWidth
+//            },100);
         });
         
         $('.buttons').append('<button class="jumpBack"></button>');

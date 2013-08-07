@@ -189,7 +189,6 @@ input[type='button']:focus{
 }
 
 .volumeSlider{
-    visibility:hidden;
     height:10px;
     width:100px;
     margin-bottom:10px;

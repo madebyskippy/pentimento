@@ -708,8 +708,6 @@ var Grapher = function() {
                     if(zoomRectH < 0)   previousY += zoomRectH;
                     var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
                     var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
-                    nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
-                    ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
                     animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
                 }
                 else if(audio.paused) {
@@ -732,6 +730,7 @@ var Grapher = function() {
     //animates back to playing position before playing
     function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback) {
         animating = true;
+        nz = Math.min(Math.max(nz,minZoom),maxZoom);
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
         ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
         
@@ -1276,8 +1275,6 @@ var Grapher = function() {
                     }
                     var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
                     var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
-                    nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin);
-                    ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin);
                     
                     animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
                 }
@@ -1386,10 +1383,10 @@ var Grapher = function() {
             fullscreen(fullscreenMode);
         });
         $('#zoomIn').on('click', function() {
-            animateZoom(totalZoom*2);
+            animateZoom(totalZoom*1.5);
         });
         $('#zoomOut').on('click', function() {
-            animateZoom(totalZoom/2);
+            animateZoom(totalZoom*2/3);
         });
         
         audio.addEventListener('play', start);
@@ -1446,7 +1443,7 @@ var Grapher = function() {
         
         console.log(localStorage);
         
-        if (localStorage[datafile]!='undefined'){
+        if (localStorage[datafile]!=='undefined' & localStorage[datafile]!==undefined){
             var local=JSON.parse(localStorage[datafile]);
             currentI=local.currentTime;
             furthestpoint=local.furthestPoint;

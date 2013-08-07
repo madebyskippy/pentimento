@@ -191,6 +191,7 @@ var Grapher = function() {
         boundingRect.height = boundingRect.ymax - boundingRect.ymin;
         minZoom = Math.min(json.width/boundingRect.width,json.height/boundingRect.height);
         $('#zoomslider').slider({min: minZoom});
+        root.show();
         resizeVisuals();
         numStrokes=json.visuals.length;
         
@@ -1156,6 +1157,7 @@ var Grapher = function() {
         sidecontrols = root.find('.sidecontrols');
         sidecontrols.hide();
         controls = root.find('.controls');
+        root.hide();
         
         var filename=getURLParameter('n',location.search);
         var t=getURLParameter('t',location.search);

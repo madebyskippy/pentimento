@@ -96,15 +96,10 @@ input[type='button']:focus{
 #slider{
     width:300px;
     float:left;
-    margin-top:20px;
-    margin-left:10px;
-}
-
-.time{
-    margin-top:20px;
-    float:left;
-    width:50px;
-    text-align:right;
+    margin-top:-5px;
+    border-radius:0;
+    height:5px;
+    position:absolute;
 }
 
 #slider .tick {
@@ -141,8 +136,9 @@ input[type='button']:focus{
 
 #totalTime{
     margin-top:20px;
-    float:right;
+    float:left;
     width: 100px;
+    margin-left:10px;
 }
 
 .buttons button{
@@ -185,8 +181,6 @@ input[type='button']:focus{
     border: 0;
     background-color: transparent;
     opacity: .7;
-    margin-right:5px;
-    float:right;
 }
 
 .volume:hover{
@@ -195,14 +189,15 @@ input[type='button']:focus{
 
 .volumeSlider{
     visibility:hidden;
-    width:10px;
-    height:100px;
+    height:10px;
+    width:100px;
     margin-bottom:10px;
+    z-index:3;
 }
 
 .volumeSlider .ui-slider-handle{
-    height:.5em;
-    margin-bottom:-.25em;
+    width:.5em;
+    margin-left:-.25em;
     
 }
 

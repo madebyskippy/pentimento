@@ -64,7 +64,6 @@ input[type='button']{
     height:50px;
     margin:3px;
     border:0px #fff solid;
-    box-shadow:0px;
     padding:0px;
     background-color:transparent;
     opacity: .5;
@@ -198,7 +197,10 @@ input[type='button']:focus{
 .volumeSlider .ui-slider-handle{
     width:.5em;
     margin-left:-.25em;
-    
+    background: #999;
+    border: none;
+    height:100%;
+    margin-top:5px;
 }
 
 .onScreenStatus{

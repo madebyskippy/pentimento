@@ -853,7 +853,7 @@ var Grapher = function() {
         $('.volume').css('margin-top',bigButtonWidths/2 - volWidth/2+3);
         $('.volumeSlider').position({
             my: 'left center',
-            at: 'right+20 center',
+            at: 'right+10 center',
             of: $('.volume'),
         });
         
@@ -1188,24 +1188,12 @@ var Grapher = function() {
             if (audio.muted){ //it was muted, unmute it
                 audio.muted=false;
                 $('.volumeSlider').slider('enable');
-                $('.volume').css('opacity','');
+                $('.volume').css('background-image','url("vol.png")');
             }else { //it wasn't muted, mute it
                 audio.muted=true;
                 $('.volumeSlider').slider('disable');
-                $('.volume').css('opacity','.1');
+                $('.volume').css('background-image','url("mute.png")');
             }
-        });
-        
-        $('.volume').on('mouseover',function(){
-//            var initialWidth=$('.volumeSlider').css('width');
-//            if ( $('.volumeSlider').css('visibility') == 'visible')
-//                $('.volumeSlider').css('visibility','hidden');
-//            else 
-//                $('.volumeSlider').css('visibility','visible');
-//            $('.volumeSlider').css('width','0px');
-//            $('.volumeSlider').animate({
-//                width: initialWidth
-//            },100);
         });
         
         $('.buttons').append('<button class="jumpBack"></button>');

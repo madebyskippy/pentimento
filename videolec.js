@@ -1172,7 +1172,7 @@ var Grapher = function() {
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
-        root.append('<div class="volumeSlider"></div>');
+        $('.controls').append('<div class="volumeSlider"></div>');
         audio.volume=.5;
         
         $('.volumeSlider').slider({
@@ -1186,6 +1186,18 @@ var Grapher = function() {
         });
         
         $('.volume').on('click',function(){
+            if (audio.muted){ //it was muted, unmute it
+                audio.muted=false;
+                $('.volumeSlider').slider('enable');
+                $('.volume').css('opacity','');
+            }else { //it wasn't muted, mute it
+                audio.muted=true;
+                $('.volumeSlider').slider('disable');
+                $('.volume').css('opacity','.1');
+            }
+        });
+        
+        $('.volume').on('mouseover',function(){
             var initialWidth=$('.volumeSlider').css('width');
             if ( $('.volumeSlider').css('visibility') == 'visible')
                 $('.volumeSlider').css('visibility','hidden');

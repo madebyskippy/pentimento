@@ -6,7 +6,7 @@ body{
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
-    -moz-user-select: moz-none;
+    -moz-user-select: -moz-none;
     -ms-user-select: none;
     user-select: none;
 }
@@ -20,7 +20,7 @@ body{
 .video{
     border:1px solid #eee;
     cursor: default;
-    background-color: '#fff';
+    background-color: #fff;
 }
 
 .speedDisplay{
@@ -64,7 +64,7 @@ input[type='button']{
     height:50px;
     margin:3px;
     border:0px #fff solid;
-    box-shadow:0;
+    box-shadow:0px;
     padding:0px;
     background-color:transparent;
     opacity: .5;
@@ -114,13 +114,13 @@ input[type='button']:focus{
 }
 
 #slider .ui-slider-handle {
-    width: .6em;
+    width: 0.6em;
     border: none;
     background: #999;
     height: 300%;
-    margin-top:-5px
+    margin-top:-5px;
     top: 0;
-    margin-left: -.3em;
+    margin-left: -0.3em;
 }
 
 .pause{
@@ -145,13 +145,13 @@ input[type='button']:focus{
 .buttons button{
     background-repeat:no-repeat;
     position:absolute;
-    opacity:.5;
+    opacity:0.5;
     border: 2px #fff solid;
     background-color:transparent;
 }
 
 .buttons button:hover{
-    opacity:.7;
+    opacity:0.7;
 }
 .buttons button:active{
     opacity:1;

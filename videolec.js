@@ -308,10 +308,9 @@ var Grapher = function() {
     
     function drawBox(tx, ty, z) {
         context.beginPath();
-        context.strokeStyle = 'rgba(0,0,255,0.2)';
+        context.strokeStyle = 'rgba(0,0,255,0.1)';
         context.lineCap = 'butt';
         context.lineWidth = 5/z;
-        context.setLineDash([8,5]);
         var width = xmax*xscale/z;
         var height = ymax*yscale/z;
         context.moveTo(-tx, -ty);
@@ -320,7 +319,6 @@ var Grapher = function() {
         context.lineTo(-tx, -ty+height);
         context.lineTo(-tx, -ty);
         context.stroke();
-        context.setLineDash([0]);
     }
     
     function clearFrame() {
@@ -341,7 +339,7 @@ var Grapher = function() {
                              translateX,translateY);
         
         //draw indicator box
-        if(freePosition & !animating) {
+        if(freePosition) {
             freePosition = false;
             var box = getTransform(audio.currentTime);
             drawBox(box.tx, box.ty, box.m11);
@@ -952,15 +950,15 @@ var Grapher = function() {
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        var sideIncrement = c.height/9;
+        var sideIncrement = c.height/10;
         $('.big.transBtns').css({height:(100*yscale),
                                 width:(100*xscale),
                                 left:(offset.left+c.width+20)});
-        $('#revertPos').css({top: (offset.top)});
-        $('#seeAll').css({top: (offset.top+2*sideIncrement)});
-        $('#fullscreen').css({top: (offset.top+4*sideIncrement)});
-        $('#screenshotURL').css({top: (offset.top+6*sideIncrement)});
-        $('.small.transBtns').css({top:(offset.top+8*sideIncrement),
+        $('#revertPos').css({top: (offset.top+2*sideIncrement)});
+        $('#seeAll').css({top: (offset.top+4*sideIncrement)});
+        $('#fullscreen').css({top: (offset.top+6*sideIncrement)});
+        $('#screenshotURL').css({top: (offset.top+8*sideIncrement)});
+        $('.small.transBtns').css({top:(offset.top+0.5*sideIncrement),
                                    height:(45*yscale),
                                    width:(45*xscale)});
         $('#zoomIn').css({left: (offset.left+c.width+20)});
@@ -968,7 +966,6 @@ var Grapher = function() {
     }
     
     //custom handler to distinguish between single- and double-click events
-    //TODO: test on actual touch device
     function doubleClickHandler(input) {
         var element = input.element;
         var down = input.down;
@@ -1142,6 +1139,7 @@ var Grapher = function() {
         + " <button class='volume'></button>"
         + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
+        + "     <source id='lectureAudioOgg' type='audio/ogg'>"
         + "</audio>"
         + "</div>"
         + "</div>"
@@ -1171,6 +1169,8 @@ var Grapher = function() {
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
         source.attr('src',audioSource).appendTo(source.parent());
+        var sourceOgg=root.find('#lectureAudioOgg');
+        sourceOgg.attr('src',audioSource.replace('.mp3','.ogg').appendTo(sourceOgg.parent());
         $('.controls').append('<div class="volumeSlider"></div>');
         audio.volume=.5;
         
@@ -1302,7 +1302,7 @@ var Grapher = function() {
         });
         
         function checkForAudio() {
-            if(audio.readyState === 4 | !isAudio)
+            if(audio.readyState > 0 | !isAudio)
                 readFile(datafile,getData);
             else
                 setTimeout(checkForAudio, 50);
@@ -1352,12 +1352,12 @@ var Grapher = function() {
             }
         });
         
-        root.append('<button class="big transBtns" id="revertPos" title="Lecture View"><img src="revert.png">Revert</img></button>');
-        root.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png">See All</img></button>');
-        root.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png">Fullscreen</img></button>');
-        root.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png">Screenshot</img></button>');
-        root.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png">Zoom In</img></button>');
-        root.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png">Zoom Out</img></button>');
+        root.append('<button class="big transBtns" id="revertPos" title="Lecture View"><img src="target.png"></img></button>');
+        root.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
+        root.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
+        root.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
+        root.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
+        root.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sidecontrols.append('<br><br><textarea id="URLs" ' +
                                   'readonly="readonly" rows="3" '+
                                   'cols="8" wrap="soft"></textarea>');

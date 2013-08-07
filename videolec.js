@@ -850,18 +850,17 @@ var Grapher = function() {
         $('.volume').css('width',volWidth);
         $('.volume').css('height',volWidth);
         $('.volume').css('background-size',volWidth);
-        $('.volume').css('margin-top',bigButtonWidths/2 - volWidth/2);
+        $('.volume').css('margin-top',bigButtonWidths/2 - volWidth/2+3);
         $('.volumeSlider').position({
-            my: 'center bottom',
-            at: 'center top-10',
+            my: 'left center',
+            at: 'right+20 center',
             of: $('.volume'),
         });
         
         var timeControlWidth=parseInt(vidWidth)-totalButtonWidth-volWidth-5;
         $('.timeControls').css('width',timeControlWidth);
         $('.timeControls').css('margin-left',totalButtonWidth);
-        $('#slider').css('width',timeControlWidth-150);
-        $('#slider').css('margin-top',bigButtonWidths/2-5);
+        $('#slider').css('width',vidWidth);
         $('#totalTime').css('margin-top',bigButtonWidths/2-5);
         
         if(fullscreenMode)
@@ -1135,13 +1134,11 @@ var Grapher = function() {
         + "</div>"
         + "<br> <div class='captions'>test captions</div>"
         + "<div class='controls'>"
+        + " <div id='slider'></div>"
         + " <div class='buttons'>"
         + "     <input class='start' type='button'/>"
         + " </div>"
-        + " <div class='timeControls'>"
-        + "     <div id='slider'></div>"
-        + "     <div id='totalTime'></div>"
-        + " </div>"
+        + " <div id='totalTime'></div>"
         + " <button class='volume'></button>"
         + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
@@ -1181,17 +1178,21 @@ var Grapher = function() {
             min:0,
             step:.1,
             value:audio.volume,
-            orientation: 'vertical',
             range: "min",
             slide: function(event, ui){
                 audio.volume=ui.value;},
         });
         
         $('.volume').on('click',function(){
+            var initialWidth=$('.volumeSlider').css('width');
             if ( $('.volumeSlider').css('visibility') == 'visible')
                 $('.volumeSlider').css('visibility','hidden');
             else 
                 $('.volumeSlider').css('visibility','visible');
+            $('.volumeSlider').css('width','0px');
+            $('.volumeSlider').animate({
+                width: initialWidth
+            },100);
         });
         
         $('.buttons').append('<button class="jumpBack"></button>');

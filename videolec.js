@@ -1062,7 +1062,7 @@ var Grapher = function() {
             catch(e) {document.webkitCancelFullScreen();}
         }
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
-        root.find('#fullscreen').attr('title', 'Exit Fullscreen');
+        root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen':'Fullscreen');
         resizeVisuals();
     }
     

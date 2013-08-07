@@ -671,7 +671,7 @@ var Grapher = function() {
                 animateControls(true);
             //VISIBLE AND NOT MOUSED OVER - HIDE
             if(controlsVisible & 
-               (y < $(window).height()-controls.outerHeight(true) & 
+               (y < $(window).height()-controls.outerHeight(true)-20 & 
                 x < $(window).width()-sidecontrols.outerWidth(true)))
                 animateControls(false);
         }

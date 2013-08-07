@@ -929,7 +929,7 @@ var Grapher = function() {
         
         $('.captions').css('width',c.width);
         $('.captions').css('top',$('.controls').offset().top - 50 + 'px');
-        $('.speedDisplay').css('top',$('.controls').offset().top - 45 + 'px');
+        $('.speedDisplay').css('top', -45 + 'px');
         var fontsize = c.width * 30/575;
         if (fontsize > 30 ) fontsize=30;
         $('.speedDisplay').css('font-size', fontsize+'px');

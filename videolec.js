@@ -4,7 +4,7 @@ var Grapher = function() {
     var context;
     var contextHeight=600;
     
-    var root, sidecontrols, controls;
+    var root, controls;
     
     var ymax=800;
     var ymin=0;
@@ -220,7 +220,6 @@ var Grapher = function() {
         boundingRect.width = boundingRect.xmax - boundingRect.xmin;
         boundingRect.height = boundingRect.ymax - boundingRect.ymin;
         minZoom = Math.min(json.width/boundingRect.width,json.height/boundingRect.height);
-        $('#zoomslider').slider({min: minZoom});
         root.show();
         resizeVisuals();
         numStrokes=json.visuals.length;
@@ -245,7 +244,6 @@ var Grapher = function() {
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
             translateY = newTransform.ty;
-            $('#zoomslider').slider('value', totalZoom);
             displayZoom(totalZoom);
             clearFrame();
             changeSlider(currentI);
@@ -434,7 +432,6 @@ var Grapher = function() {
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
             translateY = newTransform.ty;
-            $('#zoomslider').slider('value', totalZoom);
             displayZoom(totalZoom);
         }
         clearFrame();
@@ -587,7 +584,6 @@ var Grapher = function() {
         totalZoom = newTransform.m11;
         translateX = newTransform.tx;
         translateY = newTransform.ty;
-        $('#zoomslider').slider('value', totalZoom);
         displayZoom(totalZoom);
         clearFrame();
         oneFrame(val);
@@ -636,15 +632,6 @@ var Grapher = function() {
     }
     
     function displayZoom(totalZoom){
-        setTimeout(function(){
-            $('#zoomlabel').html(Math.round(totalZoom*10)/10).position({
-                my: 'left center',
-                at: 'right center',
-                of: $('#zoomslider .ui-slider-handle'),
-                offset: '0,10'
-            });
-            $('#zoomlabel').css('padding-left','5px');
-        },5);
     }
     
     function pan(dx, dy) {
@@ -703,12 +690,10 @@ var Grapher = function() {
         //CHANGE THIS - for mouse move to show stuff in fullscreenmode
         if(fullscreenMode) {
             //NOT VISIBLE AND MOUSED OVER - SHOW
-            if(!controlsVisible & (y > $(window).height()-15 | x > $(window).width()-15))
+            if(!controlsVisible & y > $(window).height()-15)
                 animateControls(true);
             //VISIBLE AND NOT MOUSED OVER - HIDE
-            if(controlsVisible & 
-               (y < $(window).height()-controls.outerHeight(true)-20 & 
-                x < $(window).width()-sidecontrols.outerWidth(true)))
+            if(controlsVisible & y < $(window).height()-controls.outerHeight(true)-20)
                 animateControls(false);
         }
     }
@@ -718,16 +703,12 @@ var Grapher = function() {
             console.log('show');
             controls.css('visibility','visible');
             controls.animate({opacity: 1},200);
-            sidecontrols.css('visibility','visible');
-            sidecontrols.animate({opacity: 1},200);
             controlsVisible = true;
         }
         else {
             console.log('hide');
             controls.animate({opacity: 0},200);
             setTimeout(function(){controls.css('visibility','hidden');},200);
-            sidecontrols.animate({opacity: 0},200);
-            setTimeout(function(){sidecontrols.css('visibility','hidden');},200);
             controlsVisible = false;
         }
     }
@@ -775,7 +756,6 @@ var Grapher = function() {
         if(Date.now()-startTime > duration | (tx === nx & ty === ny & tz === nz)) {
             animating = false;
             translateX = nx, translateY = ny, totalZoom = nz;
-            $('#zoomslider').slider('value',nz);
             displayZoom(totalZoom);
             if(callback !== undefined)
                 callback();
@@ -802,7 +782,6 @@ var Grapher = function() {
     }
     
     function start(){
-        $('#zoomslider').slider({disabled:true});
         wasDragging = false;
         root.find('.start').css('background-image',
             "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
@@ -819,7 +798,6 @@ var Grapher = function() {
     }
     
     function pause(){
-        $('#zoomslider').slider({disabled:false});
         $('#timeStampURL').attr("disabled",false);
         $('#screenshotURL').attr("disabled",false);
         root.find('.start').css('background-image',
@@ -918,11 +896,6 @@ var Grapher = function() {
         $('.timeStampURL').css('margin-top',bigButtonWidths/2-10);
         $('.timeStampURL').text(urlText);
         
-        if(fullscreenMode)
-            sidecontrols.css('height', $(window).height());
-        else
-            sidecontrols.css('height',2*vidWidth/3);
-        $('#zoomslider').css('height','100%');
         displayZoom(totalZoom);
         
         clearFrame();
@@ -959,11 +932,6 @@ var Grapher = function() {
             $('.lecture').css({height: c.height,
                                width: c.width,
                                margin: 'auto auto'});
-            sidecontrols.css({position: 'absolute',
-                                    top: 0,
-                                    left: ((windowWidth-
-                                            sidecontrols.outerWidth(true))+'px'),
-                                    'background-color':'rgba(235,235,235,0.9)'});
             controls.css({position: 'absolute',
                                 top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,
@@ -976,12 +944,6 @@ var Grapher = function() {
             c.width=xmax * videoDim/scaleFactor;
             $('.lecture').css({height: 'auto',
                                width: 'auto'});
-            sidecontrols.css({position: 'absolute',
-                                    top: ($('.video').offset().top+'px'),
-                                    left: (($('.video').offset().left+
-                                            $('.video').width()+10)+'px'),
-                                    'background-color':'rgba(255,255,255,0)',
-                                    visibility: 'visible',opacity: 1});
             controls.css({position: 'absolute',
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
@@ -1184,12 +1146,6 @@ var Grapher = function() {
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
-        + "<div class='sidecontrols'>"
-        + " <div class='zoomControls'><span class='zoomlabel'>+</span>"
-        + "     <div id='zoomslider'></div>"
-        + "     <span class='zoomlabel' style='margin-top: -20px;'>-</span>"
-        + "     <div id='zoomlabel'>1</div> </div>"
-        + "</div>"
         + "<br> <div class='captions'>test captions</div>"
         + "<div class='controls'>"
         + " <div id='slider'></div>"
@@ -1218,8 +1174,6 @@ var Grapher = function() {
         root=$('.pentimento');
         root.append(template);
         zoomRect = root.find('.zoomRect');
-        sidecontrols = root.find('.sidecontrols');
-        sidecontrols.hide();
         controls = root.find('.controls');
         root.hide();
         
@@ -1289,19 +1243,6 @@ var Grapher = function() {
         $('#slider').append('<div class="tick ui-widget-content"></div>');
         $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
-        //zoom slider currently not in use
-        $('#zoomslider').slider({
-            disabled: true,
-            orientation: 'vertical',
-            range: 'min',
-            min: minZoom,
-            max: maxZoom,
-            step: 0.1,
-            value: 1,
-            start: zoomStart,
-            slide: zooming
-        });
-        
         c=root.find('.video')[0];
         
         context=c.getContext('2d');
@@ -1350,7 +1291,6 @@ var Grapher = function() {
                 if(scroll !== 0) {
                     zoomStart();
                     zooming('trash', {value: totalZoom+0.1*scroll/Math.abs(scroll)});
-                    $('#zoomslider').slider('value', totalZoom);
                 }
             }
             else

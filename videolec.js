@@ -33,7 +33,6 @@ var Grapher = function() {
     var maxZoom = 4, minZoom = 1;
     
     var audio;
-    var isAudio=true;
     
     var isScreenshot=false; //true when you're getting a screenshot and don't want scroll bars
     
@@ -91,6 +90,18 @@ var Grapher = function() {
         boundingRect.ymax = json.height;
 //        var totalReduction = 0;
         for(k in json.visuals) {
+            
+            var properties = json.visuals[k].properties;
+            for(p in properties) {
+                var property = properties[p];
+                property.red = Math.round(parseFloat(property.red)*255);
+                property.blue = Math.round(parseFloat(property.blue)*255);
+                property.green = Math.round(parseFloat(property.green)*255);
+                property.redFill = Math.round(parseFloat(property.redFill)*255);
+                property.blueFill = Math.round(parseFloat(property.blueFill)*255);
+                property.greenFill = Math.round(parseFloat(property.greenFill)*255);
+            }
+            
             var stroke = json.visuals[k].vertices;
             for(j in stroke) {
                 var point = stroke[j];
@@ -142,12 +153,12 @@ var Grapher = function() {
 //            while(j<stroke.length-10) {
 //                var point = stroke[j],
 //                    next = stroke[j+1];
-//                var ab = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x), parseInt(next.y)),
-//                    bc = getDistance(parseInt(next.x), parseInt(next.y), parseInt(next.x+1), parseInt(next.y+1)),
-//                    ac = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x+1), parseInt(next.y+1));
+//                var ab = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x), Math.round(next.y)),
+//                    bc = getDistance(Math.round(next.x), Math.round(next.y), Math.round(next.x+1), Math.round(next.y+1)),
+//                    ac = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x+1), Math.round(next.y+1));
 //                if(ab !== 0 & bc !== 0) {
 //                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
-//                    newcosb = parseInt(newcosb*1000)/1000;
+//                    newcosb = Math.round(newcosb*1000)/1000;
 //                    if(Math.abs(newcosb) !== 0.316 & Math.abs(newcosb) !== 0.707 & !isNaN(newcosb)) {
 //                        if(cosb !== undefined & newcosb/cosb < 0) {
 //                            newStrokes.push(j);
@@ -195,8 +206,6 @@ var Grapher = function() {
         resizeVisuals();
         numStrokes=json.visuals.length;
         
-        
-        
         return json;
     }
     
@@ -212,7 +221,7 @@ var Grapher = function() {
         $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         dataArray = preProcess(dataArray);
         
-        if (localStorage[datafile]!= undefined){
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
             var newTransform = getTransform(currentI);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -222,7 +231,9 @@ var Grapher = function() {
             clearFrame();
             changeSlider(currentI);
             oneFrame(currentI);
-            if (isAudio) audio.currentTime=currentI;
+            audio.addEventListener('canplay', function(){
+                audio.currentTime=currentI;
+            });
         }
 
     }
@@ -272,14 +283,12 @@ var Grapher = function() {
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             currentI = time;
             audio.currentTime = time;
+            changeSlider(time);
             
             if(!freePosition) {
                 var newTransform = getTransform(currentI);
                 freePosition = true;
                 animateToPos(Date.now(), 500, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
-                    $('#zoomslider').slider('value', totalZoom);
-                    displayZoom(totalZoom);
-                    changeSlider(time);
                     freePosition = false;
                 });
             }
@@ -407,6 +416,7 @@ var Grapher = function() {
         }
         clearFrame();
         oneFrame(currentI);
+        draw = window.requestAnimationFrame(graphData);
 	}
     
     //draw polygon for each stroke
@@ -467,17 +477,11 @@ var Grapher = function() {
                         }
                         
                         if(!deleted || !currentStroke.doesItGetDeleted) { //add properties
-                            var r=parseFloat(property.redFill) * 255;
-                            var g=parseFloat(property.greenFill) * 255;
-                            var b=parseFloat(property.blueFill) * 255;
-                            context.fillStyle="rgba("+r+","+g+
-                                              ","+b+","+(property.alphaFill*fadeIndex)+")";
+                            context.fillStyle="rgba("+property.redFill+","+property.greenFill+
+                                              ","+property.blueFill+","+(property.alphaFill*fadeIndex)+")";
                             
-                            r=parseFloat(property.red) * 255;
-                            g=parseFloat(property.green) * 255;
-                            b=parseFloat(property.blue) * 255;
-                            context.strokeStyle="rgba("+r+","+g+
-                                              ","+b+","+(property.alpha*fadeIndex)+")";
+                            context.strokeStyle="rgba("+property.red+","+property.green+
+                                              ","+property.blue+","+(property.alpha*fadeIndex)+")";
                             
                             context.lineWidth = property.thickness*xscale/50;
                             
@@ -558,7 +562,7 @@ var Grapher = function() {
         clearFrame();
         oneFrame(val);
         changeSlider(val);
-        if (isAudio) audio.currentTime=val;
+        audio.currentTime=val;
     }
     
     //triggered after a user stops sliding
@@ -603,7 +607,7 @@ var Grapher = function() {
     
     function displayZoom(totalZoom){
         setTimeout(function(){
-            $('#zoomlabel').html(parseInt(totalZoom*10)/10).position({
+            $('#zoomlabel').html(Math.round(totalZoom*10)/10).position({
                 my: 'left center',
                 at: 'right center',
                 of: $('#zoomslider .ui-slider-handle'),
@@ -778,8 +782,10 @@ var Grapher = function() {
         $('#pauseIcon').attr("src",'play_big.png');
         fadeSign('pause_big.png');
         
-        draw=clearInterval(draw);
-        draw=setInterval(graphData,50);
+//        draw=clearInterval(draw);
+//        draw=setInterval(graphData,50);
+        window.cancelAnimationFrame(draw);
+        draw = window.requestAnimationFrame(graphData);
     }
     
     function pause(){
@@ -794,11 +800,13 @@ var Grapher = function() {
         $('#pauseIcon').attr("src",'pause_big.png');
         fadeSign('play_big.png');
         
-        draw=clearInterval(draw);
+//        draw=clearInterval(draw);
+        window.cancelAnimationFrame(draw);
     }
     
     function stop(){
-        draw=clearInterval(draw);
+//        draw=clearInterval(draw);
+        window.cancelAnimationFrame(draw);
         
         localStorage[datafile]=undefined;
         
@@ -830,8 +838,8 @@ var Grapher = function() {
             vidWidth = $(window).width();
         controls.css('width', vidWidth);
         
-        var bigButtonWidths=parseInt(vidWidth* 50 / 575);
-        var smallButtonWidths=parseInt(vidWidth* 30/575);
+        var bigButtonWidths=Math.round(vidWidth* 50 / 575);
+        var smallButtonWidths=Math.round(vidWidth* 30/575);
         if (bigButtonWidths > 50 ) {
             bigButtonWidths=50;
             smallButtonWidths=30;
@@ -859,7 +867,7 @@ var Grapher = function() {
             of: $('.volume'),
         });
         
-        var timeControlWidth=parseInt(vidWidth)-totalButtonWidth-volWidth-5;
+        var timeControlWidth=Math.round(vidWidth)-totalButtonWidth-volWidth-5;
         $('.timeControls').css('width',timeControlWidth);
         $('.timeControls').css('margin-left',totalButtonWidth);
         $('#slider').css('width',vidWidth);
@@ -894,6 +902,7 @@ var Grapher = function() {
         }
         
         if(fullscreenMode) {
+            $('body').css('padding',0);
             root.find('.menulink').hide();
             c.height = windowHeight;
             c.width = xmax/ymax*c.height;
@@ -915,6 +924,7 @@ var Grapher = function() {
                                 'background-color':'rgba(235,235,235,0.9)'});
         }
         else {
+            $('body').css('padding','50px');
             root.find('.menulink').show();
             c.height=ymax * videoDim/scaleFactor;
             c.width=xmax * videoDim/scaleFactor;
@@ -986,7 +996,11 @@ var Grapher = function() {
         }
         function onClick() {
             element.on('mouseup', listenClick);
-            element.on('mousedown', down);
+            element.on('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                down(e);
+            });
             element.on('mousemove', move);
         }
         function on() {
@@ -996,6 +1010,8 @@ var Grapher = function() {
                 down(e.originalEvent.touches[0]);
             });
             element.on('touchmove', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 offClick();
                 move(e.originalEvent.touches[0]);
             });
@@ -1052,14 +1068,16 @@ var Grapher = function() {
     
     function fullscreen(yes) {
         fullscreenMode = yes;
-        if(yes) {
-            try {root[0].mozRequestFullScreen();}
-            catch(e) {root[0].webkitRequestFullScreen();}
-        }
-        else {
-            try {document.mozCancelFullScreen();}
-            catch(e) {document.webkitCancelFullScreen();}
-        }
+        try{
+            if(yes) {
+                try {root[0].mozRequestFullScreen();}
+                catch(e) {root[0].webkitRequestFullScreen();}
+            }
+            else {
+                try {document.mozCancelFullScreen();}
+                catch(e) {document.webkitCancelFullScreen();}
+            }
+        }catch(e){}
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
         root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen':'Fullscreen');
         resizeVisuals();
@@ -1143,6 +1161,11 @@ var Grapher = function() {
         + "</div>"
         + "<div class='zoomRect'></div>";
     exports.initialize = function() {
+        var requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame;
+        window.requestAnimationFrame = requestAnimationFrame;
+        var cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame;
+        window.cancelAnimationFrame = cancelAnimationFrame;
+        
         root=$('.pentimento');
         root.append(template);
         zoomRect = root.find('.zoomRect');
@@ -1158,11 +1181,6 @@ var Grapher = function() {
         
         datafile="lectures/"+filename+".lec";
         audioSource="lectures/"+filename+".mp3";
-        
-        if (!urlExists(audioSource)) {
-            audioSource='';
-            isAudio=false;
-        }
         
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
@@ -1289,13 +1307,7 @@ var Grapher = function() {
             wasDragging = true;
         });
         
-        function checkForAudio() {
-            if(audio.readyState > 0 | !isAudio)
-                readFile(datafile,getData);
-            else
-                setTimeout(checkForAudio, 50);
-        }
-        checkForAudio();
+        readFile(datafile,getData);
         
         root.find('.jumpForward').on('click', function() {
             audio.playbackRate += 0.1;

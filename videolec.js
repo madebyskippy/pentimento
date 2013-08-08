@@ -283,14 +283,12 @@ var Grapher = function() {
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             currentI = time;
             audio.currentTime = time;
+            changeSlider(time);
             
             if(!freePosition) {
                 var newTransform = getTransform(currentI);
                 freePosition = true;
                 animateToPos(Date.now(), 500, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
-                    $('#zoomslider').slider('value', totalZoom);
-                    displayZoom(totalZoom);
-                    changeSlider(time);
                     freePosition = false;
                 });
             }
@@ -418,6 +416,7 @@ var Grapher = function() {
         }
         clearFrame();
         oneFrame(currentI);
+        draw = window.requestAnimationFrame(graphData);
 	}
     
     //draw polygon for each stroke
@@ -779,8 +778,10 @@ var Grapher = function() {
         $('#pauseIcon').attr("src",'play_big.png');
         fadeSign('pause_big.png');
         
-        draw=clearInterval(draw);
-        draw=setInterval(graphData,50);
+//        draw=clearInterval(draw);
+//        draw=setInterval(graphData,50);
+        window.cancelAnimationFrame(draw);
+        draw = window.requestAnimationFrame(graphData);
     }
     
     function pause(){
@@ -795,11 +796,13 @@ var Grapher = function() {
         $('#pauseIcon').attr("src",'pause_big.png');
         fadeSign('play_big.png');
         
-        draw=clearInterval(draw);
+//        draw=clearInterval(draw);
+        window.cancelAnimationFrame(draw);
     }
     
     function stop(){
-        draw=clearInterval(draw);
+//        draw=clearInterval(draw);
+        window.cancelAnimationFrame(draw);
         
         localStorage[datafile]=undefined;
         
@@ -895,6 +898,7 @@ var Grapher = function() {
         }
         
         if(fullscreenMode) {
+            $('body').css('padding',0);
             root.find('.menulink').hide();
             c.height = windowHeight;
             c.width = xmax/ymax*c.height;
@@ -916,6 +920,7 @@ var Grapher = function() {
                                 'background-color':'rgba(235,235,235,0.9)'});
         }
         else {
+            $('body').css('padding','50px');
             root.find('.menulink').show();
             c.height=ymax * videoDim/scaleFactor;
             c.width=xmax * videoDim/scaleFactor;
@@ -987,7 +992,11 @@ var Grapher = function() {
         }
         function onClick() {
             element.on('mouseup', listenClick);
-            element.on('mousedown', down);
+            element.on('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                down(e);
+            });
             element.on('mousemove', move);
         }
         function on() {
@@ -997,6 +1006,8 @@ var Grapher = function() {
                 down(e.originalEvent.touches[0]);
             });
             element.on('touchmove', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 offClick();
                 move(e.originalEvent.touches[0]);
             });
@@ -1053,14 +1064,16 @@ var Grapher = function() {
     
     function fullscreen(yes) {
         fullscreenMode = yes;
-        if(yes) {
-            try {root[0].mozRequestFullScreen();}
-            catch(e) {root[0].webkitRequestFullScreen();}
-        }
-        else {
-            try {document.mozCancelFullScreen();}
-            catch(e) {document.webkitCancelFullScreen();}
-        }
+        try{
+            if(yes) {
+                try {root[0].mozRequestFullScreen();}
+                catch(e) {root[0].webkitRequestFullScreen();}
+            }
+            else {
+                try {document.mozCancelFullScreen();}
+                catch(e) {document.webkitCancelFullScreen();}
+            }
+        }catch(e){}
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
         root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen':'Fullscreen');
         resizeVisuals();
@@ -1143,6 +1156,11 @@ var Grapher = function() {
         + "</div>"
         + "<div class='zoomRect'></div>";
     exports.initialize = function() {
+        var requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame;
+        window.requestAnimationFrame = requestAnimationFrame;
+        var cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame;
+        window.cancelAnimationFrame = cancelAnimationFrame;
+        
         root=$('.pentimento');
         root.append(template);
         zoomRect = root.find('.zoomRect');

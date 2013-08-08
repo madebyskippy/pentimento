@@ -11,16 +11,18 @@ body{
     user-select: none;
 }
 
-.zoomRect {
-    position: absolute;
-    float: left;
-    visibility: hidden;
-}
-
 .video{
     border:1px solid #eee;
     cursor: default;
     background-color: #fff;
+}
+
+/**stuff overlayed on top of everything**/
+
+.zoomRect {
+    position: absolute;
+    float: left;
+    visibility: hidden;
 }
 
 .speedDisplay{
@@ -48,6 +50,14 @@ body{
     visibility:hidden;
     text-align:center;
 }
+
+.onScreenStatus{
+    position: absolute;
+    z-index:5;
+    visibility: hidden;
+}
+
+/**lower bar of controls**/
 
 .controls{
     width:425px;
@@ -87,11 +97,6 @@ input[type='button']:focus{
     opacity:1;
 }
 
-.timeControls{
-    position:absolute;
-    width:375px;
-}
-
 #slider{
     width:300px;
     float:left;
@@ -122,23 +127,15 @@ input[type='button']:focus{
     margin-left: -0.3em;
 }
 
-.pause{
-    background-image: url('pause.png');
-}
-
 .start{
     background-image: url('play.png');
-}
-
-.stop{
-    background-image: url('stop.png');
 }
 
 #totalTime{
     margin-top:20px;
     float:left;
     width: 100px;
-    margin-left:10px;
+    margin-left:5px;
 }
 
 .buttons button{
@@ -193,6 +190,15 @@ input[type='button']:focus{
     z-index:3;
 }
 
+.volumeSlider .ui-slider-handle{
+    width:.5em;
+    margin-left:-.25em;
+    background: #999;
+    border: none;
+    height:100%;
+    margin-top:5px;
+}
+
 .toggleControls{
     float:right;
     font-size:12px;
@@ -208,7 +214,7 @@ input[type='button']:focus{
 }
 
 .toggleControls #zoom {
-    color:#aaa;
+    color:#aaa; /**starts out unselected**/
 }
 
 #toggleDrag .ui-slider-handle{
@@ -218,20 +224,18 @@ input[type='button']:focus{
     margin-left:-5px;
 }
 
-.volumeSlider .ui-slider-handle{
-    width:.5em;
-    margin-left:-.25em;
-    background: #999;
-    border: none;
-    height:100%;
-    margin-top:5px;
+.timeStampURL{
+    float:right;
+    margin-right:8px;
 }
 
-.onScreenStatus{
-    position: absolute;
-    z-index:5;
-    visibility: hidden;
+.URLs{
+    visibility:hidden;
+    float:right;
+    resize: none;
 }
+
+/**side bar of controls**/
 
 .sidecontrols{
     display:inline-block;

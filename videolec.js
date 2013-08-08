@@ -866,12 +866,27 @@ var Grapher = function() {
             at: 'right+10 center',
             of: $('.volume'),
         });
+        var volSliderWidth=vidWidth * 50/575
+        if (volSliderWidth>100) volSliderWidth=100;
+        if (volSliderWidth<30) volSliderWidth=30;
+        $('.volumeSlider').css('width',volSliderWidth);
         
         var timeControlWidth=Math.round(vidWidth)-totalButtonWidth-volWidth-5;
         $('.timeControls').css('width',timeControlWidth);
         $('.timeControls').css('margin-left',totalButtonWidth);
         $('#slider').css('width',vidWidth);
         $('#totalTime').css('margin-top',bigButtonWidths/2-5);
+        
+        var fontSize='';
+        var urlText="current URL";
+        if (vidWidth < 500) {
+            fontSize='10px';
+            urlText="URL";
+        }
+        $('.toggleControls').css('font-size',fontSize);
+        $('.toggleControls').css('margin-top',bigButtonWidths/2-10);
+        $('.timeStampURL').css('margin-top',bigButtonWidths/2-10);
+        $('.timeStampURL').text(urlText);
         
         if(fullscreenMode)
             sidecontrols.css('height', $(window).height());
@@ -891,13 +906,14 @@ var Grapher = function() {
         //fit canvas to window width
         if (windowWidth>(windowHeight+150)) { //take smaller of the two
             videoDim=(windowHeight-200);
-            if (videoDim<100) {
-                videoDim=100;
+            if (videoDim< parseInt(400 * ymax/xmax)) {
+                videoDim=parseInt(400* ymax/xmax);
             }
             var scaleFactor=ymax;
         }
         else {
             videoDim=windowWidth-185;
+            if (videoDim<400) videoDim=400;
             var scaleFactor=xmax;
         }
         
@@ -1151,8 +1167,11 @@ var Grapher = function() {
         + "     <input class='start' type='button'/>"
         + " </div>"
         + " <div id='totalTime'></div>"
-        + " <div class='toggleControls'>Drag To: <span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
+        + " <div class='toggleControls'>Drag To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
         + " <button class='volume'></button>"
+        + " <button class='timeStampURL'>current URL</button>"
+        + " <div class='volumeSlider'></div>"
+        + " <textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea>"
         + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "     <source id='lectureAudioOgg' type='audio/ogg'>"
@@ -1187,9 +1206,8 @@ var Grapher = function() {
         source.attr('src',audioSource).appendTo(source.parent());
         var sourceOgg=root.find('#lectureAudioOgg');
         sourceOgg.attr('src',audioSource.replace('.mp3','.ogg')).appendTo(sourceOgg.parent());
-        $('.controls').append('<div class="volumeSlider"></div>');
-        audio.volume=.5;
         
+        audio.volume=.5; //initial volume
         $('.volumeSlider').slider({
             max:1,
             min:0,
@@ -1211,8 +1229,6 @@ var Grapher = function() {
                 $('.volume').css('background-image','url("mute.png")');
             }
         });
-        
-        $('.controls').append('');
         
         $('.buttons').append('<button class="jumpBack"></button>');
         $('.buttons').append('<button class="jumpForward"></button>');
@@ -1239,6 +1255,7 @@ var Grapher = function() {
         $('#slider').append('<div class="tick ui-widget-content"></div>');
         $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
+        //zoom slider currently not in use
         $('#zoomslider').slider({
             disabled: true,
             orientation: 'vertical',
@@ -1309,6 +1326,7 @@ var Grapher = function() {
         
         readFile(datafile,getData);
         
+        //fast forward & slow down
         root.find('.jumpForward').on('click', function() {
             audio.playbackRate += 0.1;
             speedIndicators();
@@ -1357,13 +1375,7 @@ var Grapher = function() {
         root.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
         root.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
         root.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
-        sidecontrols.append('<br><br><textarea id="URLs" ' +
-                                  'readonly="readonly" rows="3" '+
-                                  'cols="8" wrap="soft"></textarea>');
-        sidecontrols.append('<br><button id="timeStampURL">current URL</button>');
-        sidecontrols.append('<br><br><input type="checkbox" name="captionsOption" value="captionsChoice" class="captionsOption">captions</input>');
         
-        sidecontrols.css('position', 'absolute');
         
         $('#revertPos').on('click', function () {
             setFreePosition(false);
@@ -1392,10 +1404,17 @@ var Grapher = function() {
         audio.addEventListener('pause', pause);
         audio.addEventListener('ended', stop);
         
-        $('#timeStampURL').on('click',function(){
+        $('.timeStampURL').on('click',function(){
+            console.log("timestamp url clicked");
+            if ( $('.URLs').css('visibility')=='hidden'){
+                $('.URLs').css('visibility','visible');
+            } else {
+                $('.URLs').css('visibility','hidden');
+            }
             var url = window.location.origin + window.location.pathname
             url = url + '?n='+ getURLParameter('n',location.search);
-            $('#URLs').val(url+'&t='+currentI);
+            $('.URLs').val(url+'&t='+Math.round(currentI*100)/100);
+            $('.URLs').select();
         });
         
         $('#screenshotURL').on('click',function(){
@@ -1442,12 +1461,14 @@ var Grapher = function() {
         
         console.log(localStorage);
         
-        if (localStorage[datafile]!=='undefined' & localStorage[datafile]!==undefined){
+        if (localStorage[datafile]!=='undefined' & //checking for localstorage data
+                localStorage[datafile]!==undefined){
             var local=JSON.parse(localStorage[datafile]);
             currentI=local.currentTime;
             furthestpoint=local.furthestPoint;
         }
-        if (t != -100) {
+        
+        if (t != -100) { //check if URL came with timestamp
             currentI=t;
         }
         

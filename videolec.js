@@ -33,7 +33,6 @@ var Grapher = function() {
     var maxZoom = 4, minZoom = 1;
     
     var audio;
-    var isAudio=true;
     
     var isScreenshot=false; //true when you're getting a screenshot and don't want scroll bars
     
@@ -91,6 +90,18 @@ var Grapher = function() {
         boundingRect.ymax = json.height;
 //        var totalReduction = 0;
         for(k in json.visuals) {
+            
+            var properties = json.visuals[k].properties;
+            for(p in properties) {
+                var property = properties[p];
+                property.red = Math.round(parseFloat(property.red)*255);
+                property.blue = Math.round(parseFloat(property.blue)*255);
+                property.green = Math.round(parseFloat(property.green)*255);
+                property.redFill = Math.round(parseFloat(property.redFill)*255);
+                property.blueFill = Math.round(parseFloat(property.blueFill)*255);
+                property.greenFill = Math.round(parseFloat(property.greenFill)*255);
+            }
+            
             var stroke = json.visuals[k].vertices;
             for(j in stroke) {
                 var point = stroke[j];
@@ -142,12 +153,12 @@ var Grapher = function() {
 //            while(j<stroke.length-10) {
 //                var point = stroke[j],
 //                    next = stroke[j+1];
-//                var ab = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x), parseInt(next.y)),
-//                    bc = getDistance(parseInt(next.x), parseInt(next.y), parseInt(next.x+1), parseInt(next.y+1)),
-//                    ac = getDistance(parseInt(point.x), parseInt(point.y), parseInt(next.x+1), parseInt(next.y+1));
+//                var ab = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x), Math.round(next.y)),
+//                    bc = getDistance(Math.round(next.x), Math.round(next.y), Math.round(next.x+1), Math.round(next.y+1)),
+//                    ac = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x+1), Math.round(next.y+1));
 //                if(ab !== 0 & bc !== 0) {
 //                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
-//                    newcosb = parseInt(newcosb*1000)/1000;
+//                    newcosb = Math.round(newcosb*1000)/1000;
 //                    if(Math.abs(newcosb) !== 0.316 & Math.abs(newcosb) !== 0.707 & !isNaN(newcosb)) {
 //                        if(cosb !== undefined & newcosb/cosb < 0) {
 //                            newStrokes.push(j);
@@ -210,7 +221,7 @@ var Grapher = function() {
         $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         dataArray = preProcess(dataArray);
         
-        if (localStorage[datafile]!= undefined){
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
             var newTransform = getTransform(currentI);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -467,27 +478,11 @@ var Grapher = function() {
                         }
                         
                         if(!deleted || !currentStroke.doesItGetDeleted) { //add properties
-                            var r=parseInt(parseFloat(property.redFill) * 255);
-                            var g=parseInt(parseFloat(property.greenFill) * 255);
-                            var b=parseInt(parseFloat(property.blueFill) * 255);
+                            context.fillStyle="rgba("+property.redFill+","+property.greenFill+
+                                              ","+property.blueFill+","+(property.alphaFill*fadeIndex)+")";
                             
-//                            var r=parseInt(Math.random()*255);
-//                            var g=parseInt(Math.random()*255);
-//                            var b=parseInt(Math.random()*255);
-                            
-                            context.fillStyle="rgba("+r+","+g+
-                                              ","+b+","+(property.alphaFill*fadeIndex)+")";
-                            
-                            r=parseInt(parseFloat(property.red) * 255);
-                            g=parseInt(parseFloat(property.green) * 255);
-                            b=parseInt(parseFloat(property.blue) * 255);
-                            
-//                            r=parseInt(Math.random()*255);
-//                            g=parseInt(Math.random()*255);
-//                            b=parseInt(Math.random()*255);
-                            
-                            context.strokeStyle="rgba("+r+","+g+
-                                              ","+b+","+(property.alpha*fadeIndex)+")";
+                            context.strokeStyle="rgba("+property.red+","+property.green+
+                                              ","+property.blue+","+(property.alpha*fadeIndex)+")";
                             
                             context.lineWidth = property.thickness*xscale/50;
                             
@@ -568,7 +563,7 @@ var Grapher = function() {
         clearFrame();
         oneFrame(val);
         changeSlider(val);
-        if (isAudio) audio.currentTime=val;
+        audio.currentTime=val;
     }
     
     //triggered after a user stops sliding
@@ -609,7 +604,7 @@ var Grapher = function() {
     
     function displayZoom(totalZoom){
         setTimeout(function(){
-            $('#zoomlabel').html(parseInt(totalZoom*10)/10).position({
+            $('#zoomlabel').html(Math.round(totalZoom*10)/10).position({
                 my: 'left center',
                 at: 'right center',
                 of: $('#zoomslider .ui-slider-handle'),
@@ -836,8 +831,8 @@ var Grapher = function() {
             vidWidth = $(window).width();
         controls.css('width', vidWidth);
         
-        var bigButtonWidths=parseInt(vidWidth* 50 / 575);
-        var smallButtonWidths=parseInt(vidWidth* 30/575);
+        var bigButtonWidths=Math.round(vidWidth* 50 / 575);
+        var smallButtonWidths=Math.round(vidWidth* 30/575);
         if (bigButtonWidths > 50 ) {
             bigButtonWidths=50;
             smallButtonWidths=30;
@@ -865,7 +860,7 @@ var Grapher = function() {
             of: $('.volume'),
         });
         
-        var timeControlWidth=parseInt(vidWidth)-totalButtonWidth-volWidth-5;
+        var timeControlWidth=Math.round(vidWidth)-totalButtonWidth-volWidth-5;
         $('.timeControls').css('width',timeControlWidth);
         $('.timeControls').css('margin-left',totalButtonWidth);
         $('#slider').css('width',vidWidth);
@@ -1163,11 +1158,6 @@ var Grapher = function() {
         
         datafile="lectures/"+filename+".lec";
         audioSource="lectures/"+filename+".mp3";
-        
-        if (!urlExists(audioSource)) {
-            audioSource='';
-            isAudio=false;
-        }
         
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');

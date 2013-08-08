@@ -195,8 +195,6 @@ var Grapher = function() {
         resizeVisuals();
         numStrokes=json.visuals.length;
         
-        
-        
         return json;
     }
     
@@ -222,7 +220,9 @@ var Grapher = function() {
             clearFrame();
             changeSlider(currentI);
             oneFrame(currentI);
-            if (isAudio) audio.currentTime=currentI;
+            audio.addEventListener('canplay', function(){
+                audio.currentTime=currentI;
+            });
         }
 
     }
@@ -467,15 +467,25 @@ var Grapher = function() {
                         }
                         
                         if(!deleted || !currentStroke.doesItGetDeleted) { //add properties
-                            var r=parseFloat(property.redFill) * 255;
-                            var g=parseFloat(property.greenFill) * 255;
-                            var b=parseFloat(property.blueFill) * 255;
+                            var r=parseInt(parseFloat(property.redFill) * 255);
+                            var g=parseInt(parseFloat(property.greenFill) * 255);
+                            var b=parseInt(parseFloat(property.blueFill) * 255);
+                            
+//                            var r=parseInt(Math.random()*255);
+//                            var g=parseInt(Math.random()*255);
+//                            var b=parseInt(Math.random()*255);
+                            
                             context.fillStyle="rgba("+r+","+g+
                                               ","+b+","+(property.alphaFill*fadeIndex)+")";
                             
-                            r=parseFloat(property.red) * 255;
-                            g=parseFloat(property.green) * 255;
-                            b=parseFloat(property.blue) * 255;
+                            r=parseInt(parseFloat(property.red) * 255);
+                            g=parseInt(parseFloat(property.green) * 255);
+                            b=parseInt(parseFloat(property.blue) * 255);
+                            
+//                            r=parseInt(Math.random()*255);
+//                            g=parseInt(Math.random()*255);
+//                            b=parseInt(Math.random()*255);
+                            
                             context.strokeStyle="rgba("+r+","+g+
                                               ","+b+","+(property.alpha*fadeIndex)+")";
                             
@@ -1284,13 +1294,7 @@ var Grapher = function() {
             wasDragging = true;
         });
         
-        function checkForAudio() {
-            if(audio.readyState > 0 | !isAudio)
-                readFile(datafile,getData);
-            else
-                setTimeout(checkForAudio, 50);
-        }
-        checkForAudio();
+        readFile(datafile,getData);
         
         root.find('.jumpForward').on('click', function() {
             audio.playbackRate += 0.1;

@@ -27,6 +27,8 @@ var Grapher = function() {
     var controlsVisible = true;
     var freePosition = false;
     var animating = false;
+    var discoMode = false;
+    var minDistance=10; //if the point is further than this then ignore it
     
     //LIMITS ON THINGS
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
@@ -88,7 +90,8 @@ var Grapher = function() {
         //get bounding box
         boundingRect.xmax = json.width;
         boundingRect.ymax = json.height;
-//        var totalReduction = 0;
+        var origVertices = 0;
+        var finalVertices = 0;
         for(k in json.visuals) {
             
             var properties = json.visuals[k].properties;
@@ -112,34 +115,50 @@ var Grapher = function() {
                 if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
             }
             
-//            var orig = stroke.length;
-//            //simplify strokes
-//            var j=0;
-//            var step=5;
-//            while(j<stroke.length-step) {
-//                var sumDist = 0;
-//                var a = stroke[j];
-//                var c = stroke[j+step];
-//                var bx = c.x-a.x;
-//                var by = c.y-a.y;
-//                for(var i=j+1; i<j+step; i++) {
-//                    var b = stroke[i];
-//                    var ax = b.x-a.x;
-//                    var ay = b.y-a.y;
-//                    var dot = (ax*bx+ay*by)/(bx*bx+by*by);
-//                    var cx = ax-dot*bx;
-//                    var cy = ay-dot*by;
-//                    sumDist += Math.sqrt(cx*cx+cy*cy);
-//                }
-//                if(sumDist < 0.2) {
-//                    stroke.splice(j+1,step);
-//                    j--;
-//                }
-//                j++;
-//            }
-//            totalReduction += orig-stroke.length;
+            origVertices += stroke.length;
+            //simplify strokes
+            var j=0;
+            while(j<stroke.length-1) {
+                var point = stroke[j];
+                var next = stroke[j+1];
+                if(getDistance(point.x, point.y, next.x, next.y) < 2) {
+                    stroke.splice(j+1,1);
+                }
+                else
+                    j++;
+            }
+            //straighten straight lines
+            var begin = stroke[0];
+            var end = stroke[stroke.length-1];
+            var sumDist = 0;
+            var bx = end.x-begin.x;
+            var by = end.y-begin.y;
+            for(i in stroke) {
+                var point = stroke[i];
+                var ax = point.x-begin.x;
+                var ay = point.y-begin.y;
+                var dot = (ax*bx+ay*by)/(bx*bx+by*by);
+                var cx = ax-dot*bx;
+                var cy = ay-dot*by;
+                sumDist += Math.sqrt(cx*cx+cy*cy);
+            }
+            if(sumDist < getDistance(begin.x,begin.y,end.x,end.y)/10) {
+                j=1;
+                while(j<stroke.length-1) {
+                    var point=stroke[j];
+                    var timescale=(point.t-begin.t)/(end.t-begin.t);
+                    point.x=timescale*(end.x-begin.x)+begin.x;
+                    point.y=timescale*(end.y-begin.y)+begin.y;
+                    var prev=stroke[j-1];
+                    if(getDistance(point.x,point.y,prev.x,prev.y)<2)
+                        stroke.splice(j,1);
+                    else
+                        j++;
+                }
+            }
+            finalVertices += stroke.length;
         }
-//        console.log(totalReduction);
+        console.log(origVertices, finalVertices);
 //        //divide into similar-direction polygons
 //        var totnews = 0;
 //        for(var i=0; i<json.visuals.length; i++) {
@@ -255,7 +274,6 @@ var Grapher = function() {
     function selectStroke(x,y){
         x=x/xscale;
         y=y/yscale;
-        var minDistance=10; //if the point is further than this then ignore it
         var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
         for(var i=0; i<numStrokes; i++){
             var currentStroke=dataArray.visuals[i];
@@ -334,6 +352,11 @@ var Grapher = function() {
         // Use the identity matrix while clearing the canvas
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, c.width, c.height);
+        
+        if(discoMode) {
+            context.fillStyle = 'rgb('+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
+            context.fillRect(0,0,c.width,c.height);
+        }
         
         translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale*totalZoom);
         translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
@@ -482,6 +505,13 @@ var Grapher = function() {
                             
                             context.strokeStyle="rgba("+property.red+","+property.green+
                                               ","+property.blue+","+(property.alpha*fadeIndex)+")";
+                            
+                            if(discoMode) {
+                                context.fillStyle = 'rgb('+Math.round(Math.random()*255)+','+
+                                    Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
+                                context.strokeStyle = 'rgb('+Math.round(Math.random()*255)+','+
+                                    Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
+                            }
                             
                             context.lineWidth = property.thickness*xscale/50;
                             
@@ -767,7 +797,7 @@ var Grapher = function() {
             
             setTimeout(function() {
                 animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback);
-            }, 50);
+            }, 33);
         }
     }
     
@@ -1221,18 +1251,22 @@ var Grapher = function() {
         $('#slider').slider({
             max:100,
             min:0,
-            step:.1,
+            step:0.1,
             range: 'max',
             stop: sliderStop,
             start: sliderStart,
             slide: sliderTime,
             change: function(event,ui){
                 if (event.originalEvent) {
-                    sliderStart();
-                    sliderTime(event,ui);
-                    sliderStop();
-                    }
+                    audio.currentTime = ui.value;
+                    var next = getTransform(ui.value);
+                    var initFree = freePosition;
+                    freePosition = true;
+                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, next.tx, next.ty, next.m11, function() {
+                        freePosition = initFree;
+                    });
                 }
+            }
                     //only call if it was a user-induced change, not program-induced
         });
         
@@ -1438,6 +1472,8 @@ var Grapher = function() {
                 event.stopPropagation();
                 fullscreen(false);
             }
+            if(keyCode===68)
+                discoMode = !discoMode;
         });
         
         console.log(localStorage);

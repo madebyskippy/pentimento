@@ -25,6 +25,7 @@ var Grapher = function() {
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     var fullscreenMode = false;
     var controlsVisible = true;
+    var btnsVisible = true;
     var freePosition = false;
     var animating = false;
     var discoMode = false;
@@ -689,27 +690,40 @@ var Grapher = function() {
         
         //CHANGE THIS - for mouse move to show stuff in fullscreenmode
         if(fullscreenMode) {
-            //NOT VISIBLE AND MOUSED OVER - SHOW
             if(!controlsVisible & y > $(window).height()-15)
                 animateControls(true);
-            //VISIBLE AND NOT MOUSED OVER - HIDE
             if(controlsVisible & y < $(window).height()-controls.outerHeight(true)-20)
                 animateControls(false);
+            if(!btnsVisible & x > offset.left+c.width)
+                animateBtns(true);
+            if(btnsVisible & x < offset.left+c.width)
+                animateBtns(false);
         }
     }
     
     function animateControls(show) {
         if(show) {
-            console.log('show');
-            controls.css('visibility','visible');
-            controls.animate({opacity: 1},200);
+//            controls.css('visibility','visible');
+//            controls.animate({opacity: 1},200);
+            controls.animate({top: (c.height-controls.outerHeight(true))},200);
             controlsVisible = true;
         }
         else {
-            console.log('hide');
-            controls.animate({opacity: 0},200);
-            setTimeout(function(){controls.css('visibility','hidden');},200);
+//            controls.animate({opacity: 0},200);
+//            setTimeout(function(){controls.css('visibility','hidden');},200);
+            controls.animate({top: c.height},200);
             controlsVisible = false;
+        }
+    }
+    
+    function animateBtns(show) {
+        if(show) {
+            $('.transBtns').animate({left: (offset.left+c.width+c.height/24)},200);
+            btnsVisible = true;
+        }
+        else {
+            $('.transBtns').animate({left: (2*offset.left+c.width)},200);
+            btnsVisible = false;
         }
     }
     
@@ -972,19 +986,17 @@ var Grapher = function() {
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        var sideIncrement = c.height/10;
-        $('.big.transBtns').css({height:(100*yscale),
-                                width:(100*xscale),
-                                left:(offset.left+c.width+20)});
-        $('#revertPos').css({top: (offset.top+2*sideIncrement)});
-        $('#seeAll').css({top: (offset.top+4*sideIncrement)});
-        $('#fullscreen').css({top: (offset.top+6*sideIncrement)});
-        $('#screenshotURL').css({top: (offset.top+8*sideIncrement)});
-        $('.small.transBtns').css({top:(offset.top+0.5*sideIncrement),
-                                   height:(45*yscale),
-                                   width:(45*xscale)});
-        $('#zoomIn').css({left: (offset.left+c.width+20)});
-        $('#zoomOut').css({left: (offset.left+c.width+20+55*xscale)});
+        var sideIncrement = c.height/6;
+        var transBtnDim = sideIncrement/2;
+        $('.transBtns').css({height:transBtnDim,
+                             width:transBtnDim,
+                             left:(offset.left+c.width+transBtnDim/2)});
+        $('#zoomIn').css({top: (offset.top+0.25*sideIncrement)});
+        $('#revertPos').css({top: (offset.top+1.25*sideIncrement)});
+        $('#zoomOut').css({top: (offset.top+2.25*sideIncrement)});
+        $('#seeAll').css({top: (offset.top+3.25*sideIncrement)});
+        $('#fullscreen').css({top: (offset.top+4.25*sideIncrement)});
+        $('#screenshotURL').css({top: (offset.top+5.25*sideIncrement)});
     }
     
     //custom handler to distinguish between single- and double-click events

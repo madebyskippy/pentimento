@@ -566,6 +566,10 @@ var Grapher = function() {
         if (initialPause){ //if it was paused, don't do anything
             return;
         }
+        if (ui.value == imax){
+            stop();
+            return;
+        }
         audio.play();
     }
     
@@ -1129,6 +1133,7 @@ var Grapher = function() {
         + "     <input class='start' type='button'/>"
         + " </div>"
         + " <div id='totalTime'></div>"
+        + " <div class='toggleControls'>Drag To: <span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
         + " <button class='volume'></button>"
         + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
@@ -1189,7 +1194,7 @@ var Grapher = function() {
             }
         });
         
-        $('.controls').append('<div class="toggleControls">Drag To: <span id="pan">Pan</span><div id="toggleDrag"></div><span id="zoom">Zoom</span></div>');
+        $('.controls').append('');
         
         $('.buttons').append('<button class="jumpBack"></button>');
         $('.buttons').append('<button class="jumpForward"></button>');

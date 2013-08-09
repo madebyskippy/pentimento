@@ -181,29 +181,30 @@ var Grapher = function() {
                     var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
                     if(!isNaN(newcosb) & Math.abs(newcosb) > 0.3) {
                         if(cosb !== undefined & newcosb/cosb <= 0) {
-                            newStrokes.push(j);
+//                            newStrokes.push(j);
+                            json.visuals[i].vertices[j].break = true;
                         }
                         cosb = newcosb;
                     }
                 }
                 j++;
             }
-            if(newStrokes.length !== 0) {
-                newStrokes.push(stroke.length-1);
-                //at each breaking point, create new stroke
-                for(var k=0; k<newStrokes.length-1; k++) {
-                    var begin = newStrokes[k];
-                    var end = newStrokes[k+1];
-                    var newVertices = [];
-                    var newVisual;
-                    for(var h=begin-1; h<=end+1; h++)
-                        newVertices.push($.extend(true,{},stroke[h]));
-                    newVisual = $.extend(true,{},visual);
-                    newVisual.vertices = newVertices;
-                    json.visuals.push(newVisual);
-                }
-                json.visuals[i].vertices = stroke.slice(0,newStrokes[0]+1);
-            }
+//            if(newStrokes.length !== 0) {
+//                newStrokes.push(stroke.length-1);
+//                //at each breaking point, create new stroke
+//                for(var k=0; k<newStrokes.length-1; k++) {
+//                    var begin = newStrokes[k];
+//                    var end = newStrokes[k+1];
+//                    var newVertices = [];
+//                    var newVisual;
+//                    for(var h=begin-1; h<=end+1; h++)
+//                        newVertices.push($.extend(true,{},stroke[h]));
+//                    newVisual = $.extend(true,{},visual);
+//                    newVisual.vertices = newVertices;
+//                    json.visuals.push(newVisual);
+//                }
+//                json.visuals[i].vertices = stroke.slice(0,newStrokes[0]+1);
+//            }
         }
         var finalIndex = 0;
         for(i in json.visuals)
@@ -446,23 +447,40 @@ var Grapher = function() {
     
     //draw polygon for each stroke
     //TODO: break stroke into portions
-    function calligraphize(startIndex, path) {
-        context.beginPath();
+    function calligraphize(startIndex, path, reversed) {
+        if(startIndex === 0)
+            context.beginPath();
+//        else
+//            startIndex -= 1;
         var point = path[startIndex];
         var endIndex = path.length-1;
         context.moveTo(point[0]+point[2],point[1]-point[2]);
         for(var i=startIndex+1; i<path.length-1; i++) {
             point = path[i];
-            context.lineTo(point[0]+point[2],point[1]-point[2]);
+            if(point[3]) {
+                endIndex = i;
+                i = path.length;
+            }
+            if(reversed)
+                context.lineTo(point[0]-point[2],point[1]+point[2]);
+            else
+                context.lineTo(point[0]+point[2],point[1]-point[2]);
         }
         for(var i=endIndex; i>=startIndex; i--) {
             point = path[i];
-            context.lineTo(point[0]-point[2],point[1]+point[2]);
+            if(reversed)
+                context.lineTo(point[0]+point[2],point[1]-point[2]);
+            else
+                context.lineTo(point[0]-point[2],point[1]+point[2]);
         }
         point = path[startIndex];
         context.lineTo(point[0]+point[2],point[1]-point[2]);
-        context.stroke();
-        context.fill();
+        if(endIndex !== path.length-1)
+            calligraphize(endIndex, path, !reversed);
+        else {
+            context.stroke();
+            context.fill();
+        }
     }
     
     //displays one frame
@@ -516,7 +534,7 @@ var Grapher = function() {
                                     Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
                             }
                             
-                            context.lineWidth = property.thickness*xscale/50;
+                            context.lineWidth = property.thickness*xscale/10;
                             
                             if(tmin > current) {
                                 context.fillStyle = "rgba(100,100,100,0.1)";
@@ -534,18 +552,19 @@ var Grapher = function() {
                         var x=data[j].x*xscale;
                         var y=data[j].y*yscale;
                         var pressure = data[j].pressure;
+                        var breaking = data[j].break;
                         if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
-                            path.push([x,y,pressure*context.lineWidth*16]);
+                            path.push([x,y,pressure*context.lineWidth*3,breaking]);
                         }
                         else if(data[j].t < furthestpoint & data[j].t > current)
-                            graypath.push([x,y,pressure*context.lineWidth*16]);
+                            graypath.push([x,y,pressure*context.lineWidth*3,breaking]);
                     }
                     if(path.length > 0)
-                        calligraphize(0, path);
+                        calligraphize(0, path, false);
                     if(graypath.length > 0) {
                         context.fillStyle = "rgba(100,100,100,0.1)";
                         context.strokeStyle = "rgba(50,50,50,0.1)";
-                        calligraphize(0, graypath);
+                        calligraphize(0, graypath, false);
                     }
                 }
             }

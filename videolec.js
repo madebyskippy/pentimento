@@ -120,7 +120,7 @@ var Grapher = function() {
             origVertices += stroke.length;
             //simplify strokes
             var j=0;
-            while(j<stroke.length-1) {
+            while(j<stroke.length-1 & stroke.length > 10) {
                 var point = stroke[j];
                 var next = stroke[j+1];
                 if(getDistance(point.x, point.y, next.x, next.y) < 2) {
@@ -128,6 +128,21 @@ var Grapher = function() {
                 }
                 else
                     j++;
+            }
+            //clean up beginning/end
+            var clean = false;
+            while(!clean & stroke.length > 10) {
+                if(stroke[0].pressure < 0.1 | stroke[0].pressure < 0.5*stroke[1].pressure)
+                    stroke.splice(0,1);
+                else
+                    clean = true;
+            }
+            clean = false;
+            while(!clean & stroke.length > 10) {
+                if(stroke[stroke.length-1].pressure < 0.1 | stroke[stroke.length-1].pressure < 0.5*stroke[stroke.length-2].pressure)
+                    stroke.splice(stroke.length-1,1);
+                else
+                    clean = true;
             }
             //straighten straight lines
             var begin = stroke[0];
@@ -162,11 +177,9 @@ var Grapher = function() {
         }
         console.log(origVertices, finalVertices);
         //divide into similar-direction polygons
-        var endIndex = json.visuals.length;
-        for(var i=0; i<endIndex; i++) {
+        for(var i=0; i<json.visuals.length; i++) {
             var visual = json.visuals[i],
-                stroke = visual.vertices,
-                newStrokes = [];
+                stroke = visual.vertices;
             //find all breaking points
             var cosb;
             var j=2;
@@ -181,7 +194,6 @@ var Grapher = function() {
                     var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
                     if(!isNaN(newcosb) & Math.abs(newcosb) > 0.3) {
                         if(cosb !== undefined & newcosb/cosb <= 0) {
-//                            newStrokes.push(j);
                             json.visuals[i].vertices[j].break = true;
                         }
                         cosb = newcosb;
@@ -189,28 +201,7 @@ var Grapher = function() {
                 }
                 j++;
             }
-//            if(newStrokes.length !== 0) {
-//                newStrokes.push(stroke.length-1);
-//                //at each breaking point, create new stroke
-//                for(var k=0; k<newStrokes.length-1; k++) {
-//                    var begin = newStrokes[k];
-//                    var end = newStrokes[k+1];
-//                    var newVertices = [];
-//                    var newVisual;
-//                    for(var h=begin-1; h<=end+1; h++)
-//                        newVertices.push($.extend(true,{},stroke[h]));
-//                    newVisual = $.extend(true,{},visual);
-//                    newVisual.vertices = newVertices;
-//                    json.visuals.push(newVisual);
-//                }
-//                json.visuals[i].vertices = stroke.slice(0,newStrokes[0]+1);
-//            }
         }
-        var finalIndex = 0;
-        for(i in json.visuals)
-            finalIndex += json.visuals[i].vertices.length;
-        console.log(origVertices, finalIndex);
-        console.log(endIndex, json.visuals.length);
         //invert y transforms
         for(i in json.cameraTransforms) {
             var transform = json.cameraTransforms[i];
@@ -450,16 +441,14 @@ var Grapher = function() {
     function calligraphize(startIndex, path, reversed) {
         if(startIndex === 0)
             context.beginPath();
-//        else
-//            startIndex -= 1;
         var point = path[startIndex];
         var endIndex = path.length-1;
         context.moveTo(point[0]+point[2],point[1]-point[2]);
         for(var i=startIndex+1; i<path.length-1; i++) {
             point = path[i];
             if(point[3]) {
-                endIndex = i;
-                i = path.length;
+                endIndex = i+1;
+                i = path.length-2;
             }
             if(reversed)
                 context.lineTo(point[0]-point[2],point[1]+point[2]);
@@ -476,7 +465,7 @@ var Grapher = function() {
         point = path[startIndex];
         context.lineTo(point[0]+point[2],point[1]-point[2]);
         if(endIndex !== path.length-1)
-            calligraphize(endIndex, path, !reversed);
+            calligraphize(endIndex-1, path, !reversed);
         else {
             context.stroke();
             context.fill();

@@ -161,53 +161,55 @@ var Grapher = function() {
             finalVertices += stroke.length;
         }
         console.log(origVertices, finalVertices);
-//        //divide into similar-direction polygons
-//        var totnews = 0;
-//        for(var i=0; i<json.visuals.length; i++) {
-//            var visual = json.visuals[i],
-//                stroke = visual.vertices,
-//                newStrokes = [];
-//            //find all breaking points
-//            var cosb;
-//            var j=10;
-//            
-//            while(j<stroke.length-10) {
-//                var point = stroke[j],
-//                    next = stroke[j+1];
-//                var ab = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x), Math.round(next.y)),
-//                    bc = getDistance(Math.round(next.x), Math.round(next.y), Math.round(next.x+1), Math.round(next.y+1)),
-//                    ac = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x+1), Math.round(next.y+1));
-//                if(ab !== 0 & bc !== 0) {
-//                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
-//                    newcosb = Math.round(newcosb*1000)/1000;
-//                    if(Math.abs(newcosb) !== 0.316 & Math.abs(newcosb) !== 0.707 & !isNaN(newcosb)) {
-//                        if(cosb !== undefined & newcosb/cosb < 0) {
-//                            newStrokes.push(j);
-//                            totnews++;
-//                        }
-//                        cosb = newcosb;
-//                    }
-//                }
-//                j++;
-//            }
-//            if(newStrokes.length !== 0) {
-//                newStrokes.push(stroke.length-1);
-//                //at each breaking point, create new stroke
-//                for(var k=0; k<newStrokes.length-1; k++) {
-//                    var begin = newStrokes[k];
-//                    var end = newStrokes[k+1];
-//                    var newVertices = [];
-//                    var newVisual;
-//                    for(var h=begin; h<=end; h++)
-//                        newVertices.push(jQuery.extend(true,{},stroke[h]));
-//                    newVisual = jQuery.extend(true,{},visual);
-//                    newVisual.vertices = newVertices;
-//                    json.visuals.push(newVisual);
-//                }
-//                stroke = stroke.slice(0,newStrokes[0]+1);
-//            }
-//        }
-//        console.log(totnews);
+        //divide into similar-direction polygons
+        var endIndex = json.visuals.length;
+        for(var i=0; i<endIndex; i++) {
+            var visual = json.visuals[i],
+                stroke = visual.vertices,
+                newStrokes = [];
+            //find all breaking points
+            var cosb;
+            var j=2;
+            
+            while(j<stroke.length-2) {
+                var point = stroke[j],
+                    next = stroke[j+1];
+                var ab = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x), Math.round(next.y)),
+                    bc = getDistance(Math.round(next.x), Math.round(next.y), Math.round(next.x)+5, Math.round(next.y)+5),
+                    ac = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x)+5, Math.round(next.y)+5);
+                if(ab !== 0 & bc !== 0) {
+                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
+                    if(!isNaN(newcosb) & Math.abs(newcosb) > 0.3) {
+                        if(cosb !== undefined & newcosb/cosb <= 0) {
+                            newStrokes.push(j);
+                        }
+                        cosb = newcosb;
+                    }
+                }
+                j++;
+            }
+            if(newStrokes.length !== 0) {
+                newStrokes.push(stroke.length-1);
+                //at each breaking point, create new stroke
+                for(var k=0; k<newStrokes.length-1; k++) {
+                    var begin = newStrokes[k];
+                    var end = newStrokes[k+1];
+                    var newVertices = [];
+                    var newVisual;
+                    for(var h=begin-1; h<=end+1; h++)
+                        newVertices.push($.extend(true,{},stroke[h]));
+                    newVisual = $.extend(true,{},visual);
+                    newVisual.vertices = newVertices;
+                    json.visuals.push(newVisual);
+                }
+                json.visuals[i].vertices = stroke.slice(0,newStrokes[0]+1);
+            }
+        }
+        var finalIndex = 0;
+        for(i in json.visuals)
+            finalIndex += json.visuals[i].vertices.length;
+        console.log(origVertices, finalIndex);
+        console.log(endIndex, json.visuals.length);
         //invert y transforms
         for(i in json.cameraTransforms) {
             var transform = json.cameraTransforms[i];
@@ -226,12 +228,13 @@ var Grapher = function() {
         resizeVisuals();
         numStrokes=json.visuals.length;
         
+        console.log(json);
+        
         return json;
     }
     
     // updates lines and dataPoints with new file
     function getData(file) {
-        console.log(JSON.parse(file.responseText));
         dataArray = JSON.parse(file.responseText);
         imax = dataArray.durationInSeconds;
         xmax=dataArray.width;
@@ -400,7 +403,7 @@ var Grapher = function() {
                         nextTransform = currentTransform;
                     }
                 }
-                newTransform = jQuery.extend(true,{},previousTransform);
+                newTransform = $.extend(true,{},previousTransform);
                 if (nextTransform.time !== previousTransform.time) {
                     var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
                     newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
@@ -447,7 +450,7 @@ var Grapher = function() {
         context.beginPath();
         var point = path[startIndex];
         var endIndex = path.length-1;
-        context.moveTo(point[0],point[1]);
+        context.moveTo(point[0]+point[2],point[1]-point[2]);
         for(var i=startIndex+1; i<path.length-1; i++) {
             point = path[i];
             context.lineTo(point[0]+point[2],point[1]-point[2]);
@@ -456,7 +459,8 @@ var Grapher = function() {
             point = path[i];
             context.lineTo(point[0]-point[2],point[1]+point[2]);
         }
-        context.lineTo(point[0],point[1]);
+        point = path[startIndex];
+        context.lineTo(point[0]+point[2],point[1]-point[2]);
         context.stroke();
         context.fill();
     }
@@ -954,7 +958,7 @@ var Grapher = function() {
             controls.css({position: 'absolute',
                                 top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,
-                                'background-color':'rgba(235,235,235,0.9)'});
+                                'background-color':'rgba(245,245,245,0.9)'});
         }
         else {
             $('body').css('padding','50px');
@@ -967,8 +971,7 @@ var Grapher = function() {
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
                                 left: ($('.video').offset().left+'px'),
-                                'background-color':'rgba(255,255,255,0)',
-                                visibility: 'visible',opacity: 1});
+                                'background-color':''});
             $('.testingBtns').css('opacity',1);
         }
         

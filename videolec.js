@@ -1164,7 +1164,9 @@ var Grapher = function() {
         freePosition = free;
         $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
                              '-moz-filter': free?'sepia(100%)':'',
-                             'filter': free?'sepia(100%)':''});
+                             'filter': free?'sepia(100%)':'',
+                             '-webkit-transform': free?'scale(1.1)':'',
+                             'transform': free?'scale(1.1)':''});
     }
     
     function animateZoom(nz) {

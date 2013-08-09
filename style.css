@@ -241,6 +241,8 @@ input[type='button']:focus{
     border-width: 0;
     padding: 0;
     opacity: 0.5;
+    -webkit-transition: -webkit-transform 0.2s ease-in-out, -webkit-filter 0.2s ease-in-out;
+    transition: transform 0.2s ease-in-out, -moz-filter 0.2s ease-in-out, -webkit-filter 0.2s ease-in-out;
 }
 .transBtns img{
     height:100%;

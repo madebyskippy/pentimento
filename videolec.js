@@ -28,6 +28,7 @@ var Grapher = function() {
     var btnsVisible = true;
     var freePosition = false;
     var animating = false;
+    var animateID;
     var discoMode = false;
     var minDistance=10; //if the point is further than this then ignore it
     
@@ -273,7 +274,7 @@ var Grapher = function() {
     function selectStroke(x,y){
         x=x/xscale;
         y=y/yscale;
-        var closestPoint={stroke:-1,point:-1,distance:minDistance,time:0};
+        var closestPoint={stroke:-1,point:-1,distance:minDistance*xscale,time:0};
         for(var i=0; i<numStrokes; i++){
             var currentStroke=dataArray.visuals[i];
             for(var j=0;j<currentStroke.vertices.length; j++){
@@ -633,6 +634,14 @@ var Grapher = function() {
     }
     
     function displayZoom(totalZoom){
+        var initialFree = freePosition;
+        freePosition = false;
+        var zoom = getTransform(audio.currentTime).m11;
+        freePosition = initialFree;
+        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(1.5)':'scale(1)',
+                          'transform':totalZoom>zoom?'scale(1.5)':'scale(1)'});
+        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(1.5)':'scale(1)',
+                           'transform':totalZoom<zoom?'scale(1.5)':'scale(1)'});
     }
     
     function pan(dx, dy) {
@@ -703,14 +712,10 @@ var Grapher = function() {
     
     function animateControls(show) {
         if(show) {
-//            controls.css('visibility','visible');
-//            controls.animate({opacity: 1},200);
             controls.animate({top: (c.height-controls.outerHeight(true))},200);
             controlsVisible = true;
         }
         else {
-//            controls.animate({opacity: 0},200);
-//            setTimeout(function(){controls.css('visibility','hidden');},200);
             controls.animate({top: c.height},200);
             controlsVisible = false;
         }
@@ -718,11 +723,11 @@ var Grapher = function() {
     
     function animateBtns(show) {
         if(show) {
-            $('.transBtns').animate({left: (offset.left+c.width+c.height/24)},200);
+            $('.testingBtns').animate({opacity: 1},200);
             btnsVisible = true;
         }
         else {
-            $('.transBtns').animate({left: (2*offset.left+c.width)},200);
+            $('.testingBtns').animate({opacity: 0.3},200);
             btnsVisible = false;
         }
     }
@@ -760,6 +765,7 @@ var Grapher = function() {
     
     //animates back to playing position before playing
     function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback) {
+        clearTimeout(animateID);
         animating = true;
         nz = Math.min(Math.max(nz,minZoom),maxZoom);
         nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
@@ -789,7 +795,7 @@ var Grapher = function() {
                 oneFrame(audio.currentTime);
             }
             
-            setTimeout(function() {
+            animateID = setTimeout(function() {
                 animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback);
             }, 33);
         }
@@ -964,6 +970,7 @@ var Grapher = function() {
                                 left: ($('.video').offset().left+'px'),
                                 'background-color':'rgba(255,255,255,0)',
                                 visibility: 'visible',opacity: 1});
+            $('.testingBtns').css('opacity',1);
         }
         
         $('.captions').css('width',c.width);
@@ -990,7 +997,7 @@ var Grapher = function() {
         var transBtnDim = sideIncrement/2;
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
-                             left:(offset.left+c.width+transBtnDim/2)});
+                             left:(fullscreenMode?windowWidth-1.5*transBtnDim:offset.left+c.width+transBtnDim/2)});
         $('#zoomIn').css({top: (offset.top+0.25*sideIncrement)});
         $('#revertPos').css({top: (offset.top+1.25*sideIncrement)});
         $('#zoomOut').css({top: (offset.top+2.25*sideIncrement)});
@@ -1145,7 +1152,9 @@ var Grapher = function() {
     
     function setFreePosition(free) {
         freePosition = free;
-//        $('#revertPos').css('visibility', free?'visible':'hidden');
+        $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
+                             '-moz-filter': free?'sepia(100%)':'',
+                             'filter': free?'sepia(100%)':''});
     }
     
     function animateZoom(nz) {
@@ -1165,7 +1174,7 @@ var Grapher = function() {
         + "     <input class='start' type='button'/>"
         + " </div>"
         + " <div id='totalTime'></div>"
-        + " <div class='toggleControls'>Drag To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
+        + " <div class='toggleControls'>Drag/Scroll To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
         + " <button class='volume'></button>"
         + " <button class='timeStampURL'>current URL</button>"
         + " <div class='volumeSlider'></div>"
@@ -1355,12 +1364,14 @@ var Grapher = function() {
             }
         });
         
-        root.append('<button class="big transBtns" id="revertPos" title="Lecture View"><img src="target.png"></img></button>');
-        root.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
-        root.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
-        root.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
-        root.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
-        root.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
+        var blah=$('<div class="testingBtns"></div>');
+        root.append(blah);
+        blah.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
+        blah.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
+        blah.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
+        blah.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
+        blah.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
+        blah.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         
         
         $('#revertPos').on('click', function () {
@@ -1380,10 +1391,10 @@ var Grapher = function() {
             fullscreen(fullscreenMode);
         });
         $('#zoomIn').on('click', function() {
-            animateZoom(totalZoom*1.5);
+            animateZoom(Math.min(totalZoom*1.5,maxZoom));
         });
         $('#zoomOut').on('click', function() {
-            animateZoom(totalZoom*2/3);
+            animateZoom(Math.max(totalZoom*2/3,minZoom));
         });
         
         audio.addEventListener('play', start);

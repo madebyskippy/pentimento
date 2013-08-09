@@ -120,7 +120,7 @@ var Grapher = function() {
             origVertices += stroke.length;
             //simplify strokes
             var j=0;
-            while(j<stroke.length-1) {
+            while(j<stroke.length-1 & stroke.length > 10) {
                 var point = stroke[j];
                 var next = stroke[j+1];
                 if(getDistance(point.x, point.y, next.x, next.y) < 2) {
@@ -128,6 +128,21 @@ var Grapher = function() {
                 }
                 else
                     j++;
+            }
+            //clean up beginning/end
+            var clean = false;
+            while(!clean & stroke.length > 10) {
+                if(stroke[0].pressure < 0.1 | stroke[0].pressure < 0.5*stroke[1].pressure)
+                    stroke.splice(0,1);
+                else
+                    clean = true;
+            }
+            clean = false;
+            while(!clean & stroke.length > 10) {
+                if(stroke[stroke.length-1].pressure < 0.1 | stroke[stroke.length-1].pressure < 0.5*stroke[stroke.length-2].pressure)
+                    stroke.splice(stroke.length-1,1);
+                else
+                    clean = true;
             }
             //straighten straight lines
             var begin = stroke[0];
@@ -161,53 +176,32 @@ var Grapher = function() {
             finalVertices += stroke.length;
         }
         console.log(origVertices, finalVertices);
-//        //divide into similar-direction polygons
-//        var totnews = 0;
-//        for(var i=0; i<json.visuals.length; i++) {
-//            var visual = json.visuals[i],
-//                stroke = visual.vertices,
-//                newStrokes = [];
-//            //find all breaking points
-//            var cosb;
-//            var j=10;
-//            
-//            while(j<stroke.length-10) {
-//                var point = stroke[j],
-//                    next = stroke[j+1];
-//                var ab = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x), Math.round(next.y)),
-//                    bc = getDistance(Math.round(next.x), Math.round(next.y), Math.round(next.x+1), Math.round(next.y+1)),
-//                    ac = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x+1), Math.round(next.y+1));
-//                if(ab !== 0 & bc !== 0) {
-//                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
-//                    newcosb = Math.round(newcosb*1000)/1000;
-//                    if(Math.abs(newcosb) !== 0.316 & Math.abs(newcosb) !== 0.707 & !isNaN(newcosb)) {
-//                        if(cosb !== undefined & newcosb/cosb < 0) {
-//                            newStrokes.push(j);
-//                            totnews++;
-//                        }
-//                        cosb = newcosb;
-//                    }
-//                }
-//                j++;
-//            }
-//            if(newStrokes.length !== 0) {
-//                newStrokes.push(stroke.length-1);
-//                //at each breaking point, create new stroke
-//                for(var k=0; k<newStrokes.length-1; k++) {
-//                    var begin = newStrokes[k];
-//                    var end = newStrokes[k+1];
-//                    var newVertices = [];
-//                    var newVisual;
-//                    for(var h=begin; h<=end; h++)
-//                        newVertices.push(jQuery.extend(true,{},stroke[h]));
-//                    newVisual = jQuery.extend(true,{},visual);
-//                    newVisual.vertices = newVertices;
-//                    json.visuals.push(newVisual);
-//                }
-//                stroke = stroke.slice(0,newStrokes[0]+1);
-//            }
-//        }
-//        console.log(totnews);
+        //divide into similar-direction polygons
+        for(var i=0; i<json.visuals.length; i++) {
+            var visual = json.visuals[i],
+                stroke = visual.vertices;
+            //find all breaking points
+            var cosb;
+            var j=2;
+            
+            while(j<stroke.length-2) {
+                var point = stroke[j],
+                    next = stroke[j+1];
+                var ab = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x), Math.round(next.y)),
+                    bc = getDistance(Math.round(next.x), Math.round(next.y), Math.round(next.x)+5, Math.round(next.y)+5),
+                    ac = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x)+5, Math.round(next.y)+5);
+                if(ab !== 0 & bc !== 0) {
+                    var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
+                    if(!isNaN(newcosb) & Math.abs(newcosb) > 0.3) {
+                        if(cosb !== undefined & newcosb/cosb <= 0) {
+                            json.visuals[i].vertices[j].break = true;
+                        }
+                        cosb = newcosb;
+                    }
+                }
+                j++;
+            }
+        }
         //invert y transforms
         for(i in json.cameraTransforms) {
             var transform = json.cameraTransforms[i];
@@ -226,12 +220,13 @@ var Grapher = function() {
         resizeVisuals();
         numStrokes=json.visuals.length;
         
+        console.log(json);
+        
         return json;
     }
     
     // fills dataArray with data from given .lec file, in JSON format
     function getData(file) {
-        console.log(JSON.parse(file.responseText));
         dataArray = JSON.parse(file.responseText);
         imax = dataArray.durationInSeconds;
         xmax=dataArray.width;
@@ -404,7 +399,7 @@ var Grapher = function() {
                         nextTransform = currentTransform;
                     }
                 }
-                newTransform = jQuery.extend(true,{},previousTransform);
+                newTransform = $.extend(true,{},previousTransform);
                 if (nextTransform.time !== previousTransform.time) {
                     var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
                     newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
@@ -449,22 +444,38 @@ var Grapher = function() {
     
     //draw polygon for each stroke
     //TODO: break stroke into portions
-    function calligraphize(startIndex, path) {
-        context.beginPath();
+    function calligraphize(startIndex, path, reversed) {
+        if(startIndex === 0)
+            context.beginPath();
         var point = path[startIndex];
         var endIndex = path.length-1;
-        context.moveTo(point[0],point[1]);
+        context.moveTo(point[0]+point[2],point[1]-point[2]);
         for(var i=startIndex+1; i<path.length-1; i++) {
             point = path[i];
-            context.lineTo(point[0]+point[2],point[1]-point[2]);
+            if(point[3]) {
+                endIndex = i+1;
+                i = path.length-2;
+            }
+            if(reversed)
+                context.lineTo(point[0]-point[2],point[1]+point[2]);
+            else
+                context.lineTo(point[0]+point[2],point[1]-point[2]);
         }
         for(var i=endIndex; i>=startIndex; i--) {
             point = path[i];
-            context.lineTo(point[0]-point[2],point[1]+point[2]);
+            if(reversed)
+                context.lineTo(point[0]+point[2],point[1]-point[2]);
+            else
+                context.lineTo(point[0]-point[2],point[1]+point[2]);
         }
-        context.lineTo(point[0],point[1]);
-        context.stroke();
-        context.fill();
+        point = path[startIndex];
+        context.lineTo(point[0]+point[2],point[1]-point[2]);
+        if(endIndex !== path.length-1)
+            calligraphize(endIndex-1, path, !reversed);
+        else {
+            context.stroke();
+            context.fill();
+        }
     }
     
     //displays one frame
@@ -519,7 +530,7 @@ var Grapher = function() {
                                     Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
                             }
                             
-                            context.lineWidth = property.thickness*xscale/50;
+                            context.lineWidth = property.thickness*xscale/10;
                             
                             if(tmin > current) { //grey out strokes past current time
                                 context.fillStyle = "rgba(100,100,100,0.1)";
@@ -537,18 +548,19 @@ var Grapher = function() {
                         var x=data[j].x*xscale;
                         var y=data[j].y*yscale;
                         var pressure = data[j].pressure;
+                        var breaking = data[j].break;
                         if (data[j].t < current | tmin > current & data[j].t < furthestpoint){
-                            path.push([x,y,pressure*context.lineWidth*16]);
+                            path.push([x,y,pressure*context.lineWidth*3,breaking]);
                         }
                         else if(data[j].t < furthestpoint & data[j].t > current)
-                            graypath.push([x,y,pressure*context.lineWidth*16]);
+                            graypath.push([x,y,pressure*context.lineWidth*3,breaking]);
                     }
                     if(path.length > 0)
-                        calligraphize(0, path);
+                        calligraphize(0, path, false);
                     if(graypath.length > 0) {
                         context.fillStyle = "rgba(100,100,100,0.1)";
                         context.strokeStyle = "rgba(50,50,50,0.1)";
-                        calligraphize(0, graypath);
+                        calligraphize(0, graypath, false);
                     }
                 }
             }
@@ -977,7 +989,7 @@ var Grapher = function() {
             controls.css({position: 'absolute',
                                 top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,
-                                'background-color':'rgba(235,235,235,0.9)'});
+                                'background-color':'rgba(245,245,245,0.9)'});
         }
         else {
             $('body').css('padding','50px');
@@ -990,8 +1002,7 @@ var Grapher = function() {
                                 top: (($('.video').offset().top+
                                        $('.video').height()+10)+'px'),
                                 left: ($('.video').offset().left+'px'),
-                                'background-color':'rgba(255,255,255,0)',
-                                visibility: 'visible',opacity: 1});
+                                'background-color':''});
             $('.testingBtns').css('opacity',1);
         }
         
@@ -1176,7 +1187,9 @@ var Grapher = function() {
         freePosition = free;
         $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
                              '-moz-filter': free?'sepia(100%)':'',
-                             'filter': free?'sepia(100%)':''});
+                             'filter': free?'sepia(100%)':'',
+                             '-webkit-transform': free?'scale(1.1)':'',
+                             'transform': free?'scale(1.1)':''});
     }
     
     function animateZoom(nz) {

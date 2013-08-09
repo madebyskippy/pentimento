@@ -722,14 +722,14 @@ var Grapher = function() {
     }
     
     function animateBtns(show) {
-        if(show) {
-            $('.testingBtns').animate({opacity: 1},200);
-            btnsVisible = true;
-        }
-        else {
-            $('.testingBtns').animate({opacity: 0.3},200);
-            btnsVisible = false;
-        }
+//        if(show) {
+//            $('.testingBtns').animate({opacity: 1},200);
+//            btnsVisible = true;
+//        }
+//        else {
+//            $('.testingBtns').animate({opacity: 0.3},200);
+//            btnsVisible = false;
+//        }
     }
     
     //triggered when mouse released on canvas
@@ -950,8 +950,7 @@ var Grapher = function() {
                 c.height = ymax/xmax*c.width;
             }
             $('.lecture').css({height: c.height,
-                               width: c.width,
-                               margin: 'auto auto'});
+                               width: c.width});
             controls.css({position: 'absolute',
                                 top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,

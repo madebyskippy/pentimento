@@ -748,11 +748,11 @@ var Grapher = function() {
     
     function animateBtns(show) {
 //        if(show) {
-//            $('.testingBtns').animate({opacity: 1},200);
+//            $('.sideButtons').animate({opacity: 1},200);
 //            btnsVisible = true;
 //        }
 //        else {
-//            $('.testingBtns').animate({opacity: 0.3},200);
+//            $('.sideButtons').animate({opacity: 0.3},200);
 //            btnsVisible = false;
 //        }
     }
@@ -947,8 +947,6 @@ var Grapher = function() {
         }
         $('.toggleControls').css('font-size',fontSize);
         $('.toggleControls').css('margin-top',bigButtonWidths/2-10);
-        $('.timeStampURL').css('margin-top',bigButtonWidths/2-10);
-        $('.timeStampURL').text(urlText);
         
         displayZoom(totalZoom);
         
@@ -961,18 +959,18 @@ var Grapher = function() {
         var windowHeight=$(window).height();
         var videoDim;
         //fit canvas to window width
-        if (windowWidth>(windowHeight+150)) { //take smaller of the two
-            //the 150 is since typically width>height
+        if (windowWidth>(windowHeight+150)){//take smaller of the two
+            //add 150 to get correct aspect ratio
             videoDim=(windowHeight-200); //200 allows for bottom controls
             if (videoDim< parseInt(400 * ymax/xmax)) { //min width of video is 400
                 videoDim=parseInt(400* ymax/xmax);
             }
-            var scaleFactor=ymax;
+            var scaleFactor=ymax; //using height to scale
         }
         else {
             videoDim=windowWidth-185; //185 allows for side controls
             if (videoDim<400) videoDim=400; //min width of video is 400
-            var scaleFactor=xmax;
+            var scaleFactor=xmax; //using width to scale
         }
         
         if(fullscreenMode) {
@@ -992,7 +990,7 @@ var Grapher = function() {
                                 'background-color':'rgba(245,245,245,0.9)'});
         }
         else {
-            $('body').css('padding','50px');
+            $('body').css('padding','');
             root.find('.menulink').show();
             c.height=ymax * videoDim/scaleFactor;
             c.width=xmax * videoDim/scaleFactor;
@@ -1003,14 +1001,14 @@ var Grapher = function() {
                                        $('.video').height()+10)+'px'),
                                 left: ($('.video').offset().left+'px'),
                                 'background-color':''});
-            $('.testingBtns').css('opacity',1);
+            $('.sideButtons').css('opacity',1);
         }
         
         $('.captions').css('width',c.width);
         $('.captions').css('top',$('.controls').offset().top - 50 + 'px');
         $('.speedDisplay').css('top', -45 + 'px');
         var fontsize = c.width * 30/575;
-        if (fontsize > 30 ) fontsize=30;
+        if (fontsize > 30 ) fontsize=30; //max font size 30
         $('.speedDisplay').css('font-size', fontsize+'px');
         
         yscale=(c.height)/ymax;
@@ -1026,7 +1024,7 @@ var Grapher = function() {
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        var sideIncrement = c.height/6;
+        var sideIncrement = c.height/7;
         var transBtnDim = sideIncrement/2;
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
@@ -1037,6 +1035,7 @@ var Grapher = function() {
         $('#seeAll').css({top: (offset.top+3.25*sideIncrement)});
         $('#fullscreen').css({top: (offset.top+4.25*sideIncrement)});
         $('#screenshotURL').css({top: (offset.top+5.25*sideIncrement)});
+        $('#timeStampURL').css({top: (offset.top+6.25*sideIncrement)});
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -1211,7 +1210,6 @@ var Grapher = function() {
         + " <div id='totalTime'></div>"
         + " <div class='toggleControls'>Drag/Scroll To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
         + " <button class='volume'></button>"
-        + " <button class='timeStampURL'>current URL</button>"
         + " <div class='volumeSlider'></div>"
         + " <textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea>"
         + "<audio class='audio' preload='metadata'>"
@@ -1399,14 +1397,15 @@ var Grapher = function() {
             }
         });
         
-        var blah=$('<div class="testingBtns"></div>');
-        root.append(blah);
-        blah.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
-        blah.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
-        blah.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
-        blah.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
-        blah.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
-        blah.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
+        var sideButtons=$('<div class="sideButtons"></div>');
+        root.append(sideButtons);
+        sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time"><img src="link.png"></img></button>');
         
         
         $('#revertPos').on('click', function () {
@@ -1436,7 +1435,7 @@ var Grapher = function() {
         audio.addEventListener('pause', pause);
         audio.addEventListener('ended', stop);
         
-        $('.timeStampURL').on('click',function(){
+        $('#timeStampURL').on('click',function(){
             console.log("timestamp url clicked");
             if ( $('.URLs').css('visibility')=='hidden'){
                 $('.URLs').css('visibility','visible');

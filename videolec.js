@@ -131,16 +131,22 @@ var Grapher = function() {
             }
             //clean up beginning/end
             var clean = false;
-            while(!clean & stroke.length > 10) {
-                if(stroke[0].pressure < 0.1 | stroke[0].pressure < 0.5*stroke[1].pressure)
-                    stroke.splice(0,1);
+            var cleanIndex = 0;
+            while(!clean & cleanIndex < stroke.length-1) {
+                if(stroke[cleanIndex].pressure < 0.1 | stroke[cleanIndex].pressure < 0.5*stroke[cleanIndex+1].pressure) {
+                    stroke[cleanIndex].pressure = stroke[cleanIndex+1].pressure;
+                    cleanIndex++;
+                }
                 else
                     clean = true;
             }
             clean = false;
-            while(!clean & stroke.length > 10) {
-                if(stroke[stroke.length-1].pressure < 0.1 | stroke[stroke.length-1].pressure < 0.5*stroke[stroke.length-2].pressure)
-                    stroke.splice(stroke.length-1,1);
+            cleanIndex = stroke.length-1;
+            while(!clean & cleanIndex > 0) {
+                if(stroke[cleanIndex].pressure < 0.1 | stroke[cleanIndex].pressure < 0.5*stroke[cleanIndex-1].pressure) {
+                    stroke[cleanIndex].pressure = stroke[cleanIndex-1].pressure;
+                    cleanIndex--;
+                }
                 else
                     clean = true;
             }
@@ -182,9 +188,9 @@ var Grapher = function() {
                 stroke = visual.vertices;
             //find all breaking points
             var cosb;
-            var j=2;
+            var j=0;
             
-            while(j<stroke.length-2) {
+            while(j<stroke.length-1) {
                 var point = stroke[j],
                     next = stroke[j+1];
                 var ab = getDistance(Math.round(point.x), Math.round(point.y), Math.round(next.x), Math.round(next.y)),
@@ -650,10 +656,10 @@ var Grapher = function() {
         freePosition = false;
         var zoom = getTransform(audio.currentTime).m11;
         freePosition = initialFree;
-        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(1.5)':'scale(1)',
-                          'transform':totalZoom>zoom?'scale(1.5)':'scale(1)'});
-        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(1.5)':'scale(1)',
-                           'transform':totalZoom<zoom?'scale(1.5)':'scale(1)'});
+        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)',
+                          'transform':totalZoom>zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)'});
+        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)',
+                           'transform':totalZoom<zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)'});
     }
     
     function pan(dx, dy) {
@@ -857,7 +863,7 @@ var Grapher = function() {
         
         furthestpoint=0;
         
-        oneFrame(imax);
+//        oneFrame(imax);
     }
     
     function fadeSign(nextImg){
@@ -1003,17 +1009,17 @@ var Grapher = function() {
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        var sideIncrement = c.height/6;
+        var sideIncrement = fullscreenMode?c.height/7:c.height/6;
         var transBtnDim = sideIncrement/2;
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
                              left:(fullscreenMode?windowWidth-1.5*transBtnDim:offset.left+c.width+transBtnDim/2)});
         $('#zoomIn').css({top: (offset.top+0.25*sideIncrement)});
-        $('#revertPos').css({top: (offset.top+1.25*sideIncrement)});
-        $('#zoomOut').css({top: (offset.top+2.25*sideIncrement)});
-        $('#seeAll').css({top: (offset.top+3.25*sideIncrement)});
-        $('#fullscreen').css({top: (offset.top+4.25*sideIncrement)});
-        $('#screenshotURL').css({top: (offset.top+5.25*sideIncrement)});
+        $('#revertPos').css({top: (offset.top+sideIncrement)});
+        $('#zoomOut').css({top: (offset.top+1.625*sideIncrement)});
+        $('#seeAll').css({top: (offset.top+2.25*sideIncrement)});
+        $('#fullscreen').css({top: (offset.top+3.25*sideIncrement)});
+        $('#screenshotURL').css({top: (offset.top+4.25*sideIncrement)});
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -1165,8 +1171,8 @@ var Grapher = function() {
         $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
                              '-moz-filter': free?'sepia(100%)':'',
                              'filter': free?'sepia(100%)':'',
-                             '-webkit-transform': free?'scale(1.1)':'',
-                             'transform': free?'scale(1.1)':''});
+                             '-webkit-transform': free?'scale(1.2)':'',
+                             'transform': free?'scale(1.2)':''});
     }
     
     function animateZoom(nz) {

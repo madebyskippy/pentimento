@@ -809,6 +809,7 @@ var Grapher = function() {
             
             if(audio.paused) {
                 drawScrollBars(translateX, translateY, totalZoom);
+                displayZoom(totalZoom);
                 clearFrame();
                 oneFrame(audio.currentTime);
             }
@@ -1020,6 +1021,7 @@ var Grapher = function() {
         $('#seeAll').css({top: (offset.top+2.25*sideIncrement)});
         $('#fullscreen').css({top: (offset.top+3.25*sideIncrement)});
         $('#screenshotURL').css({top: (offset.top+4.25*sideIncrement)});
+//        $('
     }
     
     //custom handler to distinguish between single- and double-click events

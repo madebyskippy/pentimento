@@ -1042,6 +1042,9 @@ var Grapher = function() {
         $('#fullscreen').css({top: (offset.top+3.25*sideIncrement)});
         $('#screenshotURL').css({top: (offset.top+4.25*sideIncrement)});
         $('#timeStampURL').css({top: (offset.top+5.25*sideIncrement)});
+        $('.URLinfo').css({left: parseInt($('.transBtns').css('left'),10) - parseInt($('.URLinfo').css('width'),10) - 20,
+                           top: parseInt($('#timeStampURL').css('top'),10)-5,
+                           'border-right-width': transBtnDim+20});
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -1217,7 +1220,6 @@ var Grapher = function() {
         + " <div class='toggleControls'>Drag/Scroll To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
         + " <button class='volume'></button>"
         + " <div class='volumeSlider'></div>"
-        + " <textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea>"
         + "<audio class='audio' preload='metadata'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "     <source id='lectureAudioOgg' type='audio/ogg'>"
@@ -1412,6 +1414,7 @@ var Grapher = function() {
         sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
         sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time"><img src="link.png"></img></button>');
+        sideButtons.append(" <div class='URLinfo'>Link to the lecture at the current time: <br/><textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea></div>");
         
         
         $('#revertPos').on('click', function () {
@@ -1443,10 +1446,10 @@ var Grapher = function() {
         
         $('#timeStampURL').on('click',function(){
             console.log("timestamp url clicked");
-            if ( $('.URLs').css('visibility')=='hidden'){
-                $('.URLs').css('visibility','visible');
+            if ( $('.URLinfo').css('visibility')=='hidden'){
+                $('.URLinfo').css('visibility','visible');
             } else {
-                $('.URLs').css('visibility','hidden');
+                $('.URLinfo').css('visibility','hidden');
             }
             var url = window.location.origin + window.location.pathname
             url = url + '?n='+ getURLParameter('n',location.search);

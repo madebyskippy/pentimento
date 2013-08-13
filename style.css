@@ -225,14 +225,19 @@ input[type='button']:focus{
     margin-left:-5px;
 }
 
-.timeStampURL{
+.URLinfo{
+    visibility:hidden;
     float:right;
-    margin-right:8px;
+    font-size: 12px;
+    position:absolute;
+    background-color: #ddd;
+    padding:5px;
+    border-radius:10px;
+    border-right-color: #ddd;
+    border-right-style: solid;
 }
 
 .URLs{
-    visibility:hidden;
-    float:right;
     resize: none;
 }
 
@@ -244,6 +249,7 @@ input[type='button']:focus{
     opacity: 0.5;
     -webkit-transition: -webkit-transform 0.5s ease-in-out, -webkit-filter 0.2s ease-in-out;
     transition: transform 0.5s ease-in-out, -moz-filter 0.2s ease-in-out, -webkit-filter 0.2s ease-in-out;
+    z-index:1;
 }
 .transBtns img{
     height:100%;

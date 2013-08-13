@@ -1,6 +1,6 @@
 var Grapher = function() {
     exports = {};
-    var c;
+    var c; //the canvas
     var context;
     var contextHeight=600;
     
@@ -231,7 +231,7 @@ var Grapher = function() {
         return json;
     }
     
-    // updates lines and dataPoints with new file
+    // fills dataArray with data from given .lec file, in JSON format
     function getData(file) {
         dataArray = JSON.parse(file.responseText);
         imax = dataArray.durationInSeconds;
@@ -242,7 +242,7 @@ var Grapher = function() {
         $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         dataArray = preProcess(dataArray);
         
-        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //if there is data in the localstorage
             var newTransform = getTransform(currentI);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -251,13 +251,18 @@ var Grapher = function() {
             clearFrame();
             changeSlider(currentI);
             oneFrame(currentI);
-            audio.addEventListener('canplay', function(){
+            if(audio.readyState === 4)
                 audio.currentTime=currentI;
-            });
+            else {
+                audio.addEventListener('canplay', function() {
+                    audio.currentTime=currentI;
+                });
+            }
         }
 
     }
 
+    //access the .lec file and passes it to getData to process
 	function readFile(url, callback) {
 		var txtFile = new XMLHttpRequest();
 		txtFile.open("GET", url, true);	
@@ -265,20 +270,22 @@ var Grapher = function() {
 			if (txtFile.readyState != 4) {return;}  // document is ready to parse.	
 			if (txtFile.status != 200 && txtFile.status != 304) {return;}  // file is found
 			callback(txtFile);
-		}
+		};
 		if (txtFile.readyState == 4) return;
 		txtFile.send(null);
 	}
     
     
     //called when you click on the canvas
+    //finds closest stroke to the click point and goes to the beginning of the stroke
+    //if no stroke is found within minDistance, nothing happens
     function selectStroke(x,y){
         x=x/xscale;
         y=y/yscale;
         var closestPoint={stroke:-1,point:-1,distance:minDistance*xscale,time:0};
-        for(var i=0; i<numStrokes; i++){
+        for(var i=0; i<numStrokes; i++){ //run though all strokes
             var currentStroke=dataArray.visuals[i];
-            for(var j=0;j<currentStroke.vertices.length; j++){
+            for(var j=0;j<currentStroke.vertices.length; j++){ //run through all verticies
                 var deletedYet=false;
                 if (currentStroke.doesItGetDeleted){
                     if (currentStroke.tDeletion<furthestpoint) deletedYet=true;
@@ -287,7 +294,7 @@ var Grapher = function() {
                     //check closeness of x,y to this current point
                     var dist = getDistance(x,y,currentStroke.vertices[j].x,
                                            currentStroke.vertices[j].y)
-                    if (dist<closestPoint.distance){
+                    if (dist<closestPoint.distance){ //this point is closer. update closestPoint
                         closestPoint.distance=dist;
                         closestPoint.stroke=i;
                         closestPoint.point=j;
@@ -299,6 +306,7 @@ var Grapher = function() {
         
         console.log(closestPoint, initialPause);
         if (closestPoint.stroke!= -1){ //it found a close enough point
+            //update current timestep
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
             currentI = time;
             audio.currentTime = time;
@@ -311,7 +319,7 @@ var Grapher = function() {
                     freePosition = false;
                 });
             }
-            else if(audio.paused) {
+            else if(audio.paused) { //if it was previously paused, remain paused
                 clearFrame();
                 oneFrame(currentI);
             }
@@ -418,6 +426,8 @@ var Grapher = function() {
             return {tx: translateX, ty: translateY, m11: totalZoom};
     }
     
+    //executes each frame of the lecture, including visual, slider & audio
+    //this is the method that gets called each timestep.
     function graphData(){
 		currentI=audio.currentTime;
 		changeSlider(currentI);
@@ -479,6 +489,7 @@ var Grapher = function() {
     }
     
     //displays one frame
+    //only deals with visuals
     function oneFrame(current){
         
         var actualfurthest = furthestpoint;
@@ -531,7 +542,7 @@ var Grapher = function() {
                             
                             context.lineWidth = property.thickness*xscale/10;
                             
-                            if(tmin > current) {
+                            if(tmin > current) { //grey out strokes past current time
                                 context.fillStyle = "rgba(100,100,100,0.1)";
                                 context.strokeStyle = "rgba(50,50,50,0.1)";
                                 if(currentStroke.tDeletion < furthestpoint)
@@ -541,7 +552,7 @@ var Grapher = function() {
                     }
                 }
                 
-                //draw the stroke
+                //draw the actual stroke
                 if (!deleted || !currentStroke.doesItGetDeleted){
                     for (var j = 0; j < data.length; j++) { //for all verticies
                         var x=data[j].x*xscale;
@@ -578,6 +589,8 @@ var Grapher = function() {
         return minutes +":"+zeros+seconds;
     }
     
+    //changes where the handle is on the slider and the accompanying timestamp
+    //also changes the furthesttime bar
     function changeSlider(current){
         if (current<=imax){ 
             $('#slider').slider('value',current);
@@ -587,7 +600,7 @@ var Grapher = function() {
             root.find('#totalTime').html(secondsToTimestamp(secondsPassed)+" / ");
             root.find('#totalTime').append(secondsToTimestamp(imax));
             
-            //update tick
+            //update furthest time bar
             var percentage = (furthestpoint)/imax * 100;
             $('.tick').css('width',percentage+'%');
             $('.tick').css('left', '0%');//percentage + '%');
@@ -595,7 +608,8 @@ var Grapher = function() {
         }
     }
     
-    //triggered on every mouse move
+    //triggered on every mouse move of the slider
+    //sets currentI, changes lecture to reflect new currentI
     function sliderTime(){
         var val=$('#slider').slider('value');
         currentI=val;
@@ -608,11 +622,12 @@ var Grapher = function() {
         clearFrame();
         oneFrame(val);
         changeSlider(val);
-        audio.currentTime=val;
     }
     
     //triggered after a user stops sliding
+    //controls if lecture goes back to playing or not
     function sliderStop(event, ui){
+        audio.currentTime=ui.value;
         if (initialPause){ //if it was paused, don't do anything
             return;
         }
@@ -624,12 +639,13 @@ var Grapher = function() {
     }
     
     //triggered when user starts sliding
+    //pauses lecture while scrubbing
     function sliderStart(event, ui){
         initialPause=audio.paused;
         audio.pause();
     }
     
-    //triggered when zoom slider is clicked
+    //triggered when user scrolls and zoom function is started
     function zoomStart() {
         wasDragging = true;
         previousX = translateX;
@@ -637,7 +653,6 @@ var Grapher = function() {
         previousZoom = totalZoom;
     }
     
-    //triggered when zoom slider is changed
     function zooming(event, ui) {
         totalZoom = Math.max(minZoom, Math.min(ui.value, maxZoom));
         displayZoom(totalZoom);
@@ -650,6 +665,7 @@ var Grapher = function() {
             oneFrame(audio.currentTime);
         }
     }
+    
     
     function displayZoom(totalZoom){
         var initialFree = freePosition;
@@ -728,6 +744,7 @@ var Grapher = function() {
         }
     }
     
+    //for fullscreen, animates when the bottom controls come up and down
     function animateControls(show) {
         if(show) {
             controls.animate({top: (c.height-controls.outerHeight(true))},200);
@@ -741,11 +758,11 @@ var Grapher = function() {
     
     function animateBtns(show) {
 //        if(show) {
-//            $('.testingBtns').animate({opacity: 1},200);
+//            $('.sideButtons').animate({opacity: 1},200);
 //            btnsVisible = true;
 //        }
 //        else {
-//            $('.testingBtns').animate({opacity: 0.3},200);
+//            $('.sideButtons').animate({opacity: 0.3},200);
 //            btnsVisible = false;
 //        }
     }
@@ -820,6 +837,7 @@ var Grapher = function() {
         }
     }
     
+    //starts lecture
     function start(){
         wasDragging = false;
         root.find('.start').css('background-image',
@@ -836,6 +854,7 @@ var Grapher = function() {
         draw = window.requestAnimationFrame(graphData);
     }
     
+    //pauses lecture at current timestamp
     function pause(){
         $('#timeStampURL').attr("disabled",false);
         $('#screenshotURL').attr("disabled",false);
@@ -851,11 +870,12 @@ var Grapher = function() {
         window.cancelAnimationFrame(draw);
     }
     
+    //stop lecture, clears furthestpoint back to beginning
     function stop(){
 //        draw=clearInterval(draw);
         window.cancelAnimationFrame(draw);
         
-        localStorage[datafile]=undefined;
+        localStorage.removeItem(datafile);
         
         root.find('.start').css('background-image',
             "url('play.png')");
@@ -867,27 +887,30 @@ var Grapher = function() {
 //        oneFrame(imax);
     }
     
+    //animation for the pause/play image that shows up in the middle of the lecture
     function fadeSign(nextImg){
         $('.onScreenStatus').stop();
         $('.onScreenStatus').css('visibility',"visible");
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').animate({
             opacity: 0
-        },750,function(){
+        },750,function(){ //function that executes once the animation finishes
             $('.onScreenStatus').css('visibility',"hidden");
             $('.onScreenStatus').css('opacity',".5");
             $('#pauseIcon').attr('src',nextImg);
         });
     }
     
+    //resizes controls upon window size changing
     function resizeControls(vidWidth){
         if(fullscreenMode)
             vidWidth = $(window).width();
         controls.css('width', vidWidth);
         
+        //set the control buttons
         var bigButtonWidths=Math.round(vidWidth* 50 / 575);
         var smallButtonWidths=Math.round(vidWidth* 30/575);
-        if (bigButtonWidths > 50 ) {
+        if (bigButtonWidths > 50 ) { //sets large button size max at 50
             bigButtonWidths=50;
             smallButtonWidths=30;
         }
@@ -902,8 +925,9 @@ var Grapher = function() {
         $('.buttons button').css('border-radius',smallButtonWidths);
         $('.jumpForward').css('margin-left',smallButtonWidths+4);
         
+        //set volume button and slider
         var volWidth= vidWidth * 30/575;
-        if (volWidth > 30) volWidth=30;
+        if (volWidth > 30) volWidth=30; //max size of vol button is 30
         $('.volume').css('width',volWidth);
         $('.volume').css('height',volWidth);
         $('.volume').css('background-size',volWidth);
@@ -914,31 +938,31 @@ var Grapher = function() {
             of: $('.volume'),
         });
         var volSliderWidth=vidWidth * 50/575
-        if (volSliderWidth>100) volSliderWidth=100;
-        if (volSliderWidth<30) volSliderWidth=30;
+        if (volSliderWidth>100) volSliderWidth=100; //max size of slider is 100
+        if (volSliderWidth<30) volSliderWidth=30; //min size of slider is 30
         $('.volumeSlider').css('width',volSliderWidth);
         
+        //sets video slider and timestamps
         var timeControlWidth=Math.round(vidWidth)-totalButtonWidth-volWidth-5;
         $('.timeControls').css('width',timeControlWidth);
         $('.timeControls').css('margin-left',totalButtonWidth);
         $('#slider').css('width',vidWidth);
         $('#totalTime').css('margin-top',bigButtonWidths/2-5);
         
+        //sets the drag toggle controls and the current URL button
         var fontSize='';
         var urlText="current URL";
-        if (vidWidth < 500) {
+        if (vidWidth < 500) { //shrink font size if the canvas is too small
             fontSize='10px';
             urlText="URL";
         }
         $('.toggleControls').css('font-size',fontSize);
         $('.toggleControls').css('margin-top',bigButtonWidths/2-10);
-        $('.timeStampURL').css('margin-top',bigButtonWidths/2-10);
-        $('.timeStampURL').text(urlText);
         
         displayZoom(totalZoom);
         
         clearFrame();
-        oneFrame(currentI);
+        oneFrame(audio.currentTime);
     }
     
     function resizeVisuals(){
@@ -946,17 +970,18 @@ var Grapher = function() {
         var windowHeight=$(window).height();
         var videoDim;
         //fit canvas to window width
-        if (windowWidth>(windowHeight+150)) { //take smaller of the two
-            videoDim=(windowHeight-200);
-            if (videoDim< parseInt(400 * ymax/xmax)) {
+        if (windowWidth>(windowHeight+150)){//take smaller of the two
+            //add 150 to get correct aspect ratio
+            videoDim=(windowHeight-200); //200 allows for bottom controls
+            if (videoDim< parseInt(400 * ymax/xmax)) { //min width of video is 400
                 videoDim=parseInt(400* ymax/xmax);
             }
-            var scaleFactor=ymax;
+            var scaleFactor=ymax; //using height to scale
         }
         else {
-            videoDim=windowWidth-185;
-            if (videoDim<400) videoDim=400;
-            var scaleFactor=xmax;
+            videoDim=windowWidth-185; //185 allows for side controls
+            if (videoDim<400) videoDim=400; //min width of video is 400
+            var scaleFactor=xmax; //using width to scale
         }
         
         if(fullscreenMode) {
@@ -976,7 +1001,7 @@ var Grapher = function() {
                                 'background-color':'rgba(245,245,245,0.9)'});
         }
         else {
-            $('body').css('padding','50px');
+            $('body').css('padding','');
             root.find('.menulink').show();
             c.height=ymax * videoDim/scaleFactor;
             c.width=xmax * videoDim/scaleFactor;
@@ -987,14 +1012,14 @@ var Grapher = function() {
                                        $('.video').height()+10)+'px'),
                                 left: ($('.video').offset().left+'px'),
                                 'background-color':''});
-            $('.testingBtns').css('opacity',1);
+            $('.sideButtons').css('opacity',1);
         }
         
         $('.captions').css('width',c.width);
         $('.captions').css('top',$('.controls').offset().top - 50 + 'px');
         $('.speedDisplay').css('top', -45 + 'px');
         var fontsize = c.width * 30/575;
-        if (fontsize > 30 ) fontsize=30;
+        if (fontsize > 30 ) fontsize=30; //max font size 30
         $('.speedDisplay').css('font-size', fontsize+'px');
         
         yscale=(c.height)/ymax;
@@ -1012,16 +1037,15 @@ var Grapher = function() {
         
         var sideIncrement = fullscreenMode?c.height/7:c.height/6;
         var transBtnDim = sideIncrement/2;
+        $('.sideButtons').css({top: (offset.top),
+                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+c.width+10),
+                               height: (transBtnDim*7),
+                               width:sideIncrement,'border-radius':transBtnDim});
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
-                             left:(fullscreenMode?windowWidth-1.5*transBtnDim:offset.left+c.width+transBtnDim/2)});
-        $('#zoomIn').css({top: (offset.top+0.25*sideIncrement)});
-        $('#revertPos').css({top: (offset.top+sideIncrement)});
-        $('#zoomOut').css({top: (offset.top+1.625*sideIncrement)});
-        $('#seeAll').css({top: (offset.top+2.25*sideIncrement)});
-        $('#fullscreen').css({top: (offset.top+3.25*sideIncrement)});
-        $('#screenshotURL').css({top: (offset.top+4.25*sideIncrement)});
-//        $('
+                             margin:transBtnDim/2,
+                             'margin-bottom':0});
+        $('#seeAll').css('margin-bottom',transBtnDim);
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -1170,11 +1194,10 @@ var Grapher = function() {
     
     function setFreePosition(free) {
         freePosition = free;
-        $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
-                             '-moz-filter': free?'sepia(100%)':'',
-                             'filter': free?'sepia(100%)':'',
-                             '-webkit-transform': free?'scale(1.2)':'',
-                             'transform': free?'scale(1.2)':''});
+//        $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
+//                             '-moz-filter': free?'sepia(100%)':'',
+//                             'filter': free?'sepia(100%)':''});
+        $('#revertPos').find('img').attr('src',free?'target.gif':'target.png');
     }
     
     function animateZoom(nz) {
@@ -1196,10 +1219,9 @@ var Grapher = function() {
         + " <div id='totalTime'></div>"
         + " <div class='toggleControls'>Drag/Scroll To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
         + " <button class='volume'></button>"
-        + " <button class='timeStampURL'>current URL</button>"
         + " <div class='volumeSlider'></div>"
         + " <textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea>"
-        + "<audio class='audio' preload='metadata'>"
+        + "<audio class='audio' preload='auto'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "     <source id='lectureAudioOgg' type='audio/ogg'>"
         + "</audio>"
@@ -1344,10 +1366,12 @@ var Grapher = function() {
         //fast forward & slow down
         root.find('.jumpForward').on('click', function() {
             audio.playbackRate += 0.1;
+            audio.defaultPlaybackRate += 0.1;
             speedIndicators();
         });
         root.find('.jumpBack').on('click', function() {
             audio.playbackRate -= 0.1;
+            audio.defaultPlaybackRate -= 0.1;
             speedIndicators();
         });
         
@@ -1384,14 +1408,15 @@ var Grapher = function() {
             }
         });
         
-        var blah=$('<div class="testingBtns"></div>');
-        root.append(blah);
-        blah.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
-        blah.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
-        blah.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
-        blah.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
-        blah.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
-        blah.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
+        var sideButtons=$('<div class="sideButtons"></div>');
+        root.append(sideButtons);
+        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time"><img src="link.png"></img></button>');
         
         
         $('#revertPos').on('click', function () {
@@ -1421,7 +1446,7 @@ var Grapher = function() {
         audio.addEventListener('pause', pause);
         audio.addEventListener('ended', stop);
         
-        $('.timeStampURL').on('click',function(){
+        $('#timeStampURL').on('click',function(){
             console.log("timestamp url clicked");
             if ( $('.URLs').css('visibility')=='hidden'){
                 $('.URLs').css('visibility','visible');
@@ -1480,8 +1505,7 @@ var Grapher = function() {
         
         console.log(localStorage);
         
-        if (localStorage[datafile]!=='undefined' & //checking for localstorage data
-                localStorage[datafile]!==undefined){
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //checking for localstorage data
             var local=JSON.parse(localStorage[datafile]);
             currentI=local.currentTime;
             furthestpoint=local.furthestPoint;

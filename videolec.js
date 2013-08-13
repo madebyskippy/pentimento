@@ -1044,6 +1044,7 @@ var Grapher = function() {
         $('#timeStampURL').css({top: (offset.top+5.25*sideIncrement)});
         $('.URLinfo').css({left: parseInt($('.transBtns').css('left'),10) - parseInt($('.URLinfo').css('width'),10) - 20,
                            top: parseInt($('#timeStampURL').css('top'),10)-5,
+                           height: transBtnDim,
                            'border-right-width': transBtnDim+20});
     }
     

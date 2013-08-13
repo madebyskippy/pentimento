@@ -225,6 +225,8 @@ input[type='button']:focus{
     margin-left:-5px;
 }
 
+/**side controls**/
+
 .URLinfo{
     visibility:hidden;
     float:right;
@@ -235,6 +237,7 @@ input[type='button']:focus{
     border-radius:10px;
     border-right-color: #ddd;
     border-right-style: solid;
+    min-height:45px;
 }
 
 .URLs{

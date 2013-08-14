@@ -66,7 +66,6 @@ body{
 .controls{
     width:425px;
     height:60px;
-    z-index:9000;
 }
 
 .buttons{
@@ -161,13 +160,13 @@ input[type='button']:focus{
     opacity:1;
 }
 
-.jumpBack{
+.slowDown{
     background-image: url('slow.png');
     width:25px;
     margin:1px;
 }
 
-.jumpForward{
+.speedUp{
     background-image: url('ff.png');
     width:25px;
     margin:1px;
@@ -210,6 +209,11 @@ input[type='button']:focus{
     margin-top:10px;
 }
 
+.toggleControls #shiftinstructions{
+    font-size:10px;
+    color:#aaa;
+}
+
 #toggleDrag{
     width: 20px;
     height:10px;
@@ -241,7 +245,7 @@ input[type='button']:focus{
     border-radius:10px;
     border-right-color: #ddd;
     border-right-style: solid;
-    min-height:45px;
+    z-index: 5;
 }
 
 .URLs{
@@ -256,7 +260,7 @@ input[type='button']:focus{
     opacity: 0.5;
     -webkit-transition: -webkit-transform 0.5s ease-in-out, -webkit-filter 0.2s ease-in-out;
     transition: transform 0.5s ease-in-out, -moz-filter 0.2s ease-in-out, -webkit-filter 0.2s ease-in-out;
-    z-index:1;
+    z-index: 6;
 }
 .transBtns img{
     height:100%;
@@ -268,5 +272,5 @@ input[type='button']:focus{
 
 .sideButtons{
     position:absolute;
-    border:1px solid rgba(128,128,128,0.5);
+    background: rgba(235,235,235,0.1);
 }

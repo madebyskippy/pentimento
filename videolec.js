@@ -1,8 +1,7 @@
 var Grapher = function() {
     exports = {};
-    var c; //the canvas
+    var canvas; //the canvas
     var context;
-    var contextHeight=600;
     
     var root, controls;
     
@@ -16,16 +15,16 @@ var Grapher = function() {
     var translateY = 0;
     var totalZoom = 1;
     var previousX, previousY, previousZoom; //stand-in variables for many things
-    var isDragging = false; //true if currently panning/zooming
-    var wasDragging = false; //true if currently paused and panning/zooming
+    var mousePressed = false; //true if mouse has been pressed
+    var mouseDragged = false; //true if mouse was pressed then moved
     var dragToPan = true; //true if dragging to pan, false if dragging to zoom
-    var zoomRectW = 0, zoomRectH = 0;
-    var zoomRect;
-    var offset;
+    var startedToPan; //for if user switches modes (lets go of shift) mid-drag
+    var zoomRect; //div representing region to zoom in
+    var zoomRectW = 0, zoomRectH = 0; //zoom region dimensions
+    var offset; //position of canvas
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     var fullscreenMode = false;
     var controlsVisible = true;
-    var btnsVisible = true;
     var freePosition = false;
     var animating = false;
     var animateID;
@@ -42,51 +41,15 @@ var Grapher = function() {
     
     var furthestpoint=0; // furthest point in seconds
     
-    var imax;	// maximum time value
+    var endTime;	// maximum time value
     
-    var currentI=0; //current index of time (in seconds)
+    var currentTime=0; //current index of time (in seconds)
     var initialPause = true; //used in dragging 
         //(dragging pauses but unpauses if it was just a click)
     var draw;
     
     var numStrokes=0;
-    var dataArray;
-    
-    /***********the dataArray object****************
-        durationInSeconds: number
-        height: number
-        width: number
-        cameraTransforms: [ { m11: number,
-                              m12: number,
-                              m21: number,
-                              m22: number,
-                              time: number,
-                              tx: number,
-                              ty: number,
-                            }, {} ...]
-        pageFlips: [ { page: number,
-                       time: number
-                     }, {} ...]
-        visuals: [ { doesItGetDeleted: boolean,
-                     tDeletion: number,
-                     tEndEdit: number,
-                     tMin: number,
-                     type: string ( "stroke" )
-                     properties: [ { alpha: number,
-                                     alphaFill: number, 
-                                     blue: number, 
-                                     blueFill: number, 
-                                     green: number, 
-                                     greenFill: number, 
-                                     red: number, 
-                                     redFill: number, 
-                                     thickness: number, 
-                                     time: number, 
-                                     type: string ( "basicProperty" )
-                                    }, {}...]
-                     verticies: [ {x: number, y: number, t: number, pressure: number}, {}...]
-                   }, {} ...]
-    */
+    var dataArray; //the given lecture data
     
     function preProcess(json) {
         //get bounding box
@@ -200,7 +163,7 @@ var Grapher = function() {
                     var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
                     if(!isNaN(newcosb) & Math.abs(newcosb) > 0.3) {
                         if(cosb !== undefined & newcosb/cosb <= 0) {
-                            json.visuals[i].vertices[j].break = true;
+                            point.break = true;
                         }
                         cosb = newcosb;
                     }
@@ -222,7 +185,8 @@ var Grapher = function() {
         boundingRect.width = boundingRect.xmax - boundingRect.xmin;
         boundingRect.height = boundingRect.ymax - boundingRect.ymin;
         minZoom = Math.min(json.width/boundingRect.width,json.height/boundingRect.height);
-        root.show();
+        $('.lecture').show();
+        $('.loadingMsg').remove();
         resizeVisuals();
         numStrokes=json.visuals.length;
         
@@ -234,28 +198,27 @@ var Grapher = function() {
     // fills dataArray with data from given .lec file, in JSON format
     function getData(file) {
         dataArray = JSON.parse(file.responseText);
-        imax = dataArray.durationInSeconds;
+        endTime = dataArray.durationInSeconds;
         xmax=dataArray.width;
         ymax=dataArray.height;
-        $('#slider').slider("option","max",imax);
-        slider.max=imax;
-        $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
+        $('#slider').slider("option","max",endTime);
+        $('#totalTime').html("0:00 / "+secondsToTimestamp(endTime));
         dataArray = preProcess(dataArray);
         
         if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //if there is data in the localstorage
-            var newTransform = getTransform(currentI);
+            var newTransform = getTransform(currentTime);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
             translateY = newTransform.ty;
             displayZoom(totalZoom);
             clearFrame();
-            changeSlider(currentI);
-            oneFrame(currentI);
+            changeSlider(currentTime);
+            oneFrame(currentTime);
             if(audio.readyState === 4)
-                audio.currentTime=currentI;
+                audio.currentTime=currentTime;
             else {
                 audio.addEventListener('canplay', function() {
-                    audio.currentTime=currentI;
+                    audio.currentTime=currentTime;
                 });
             }
         }
@@ -308,12 +271,12 @@ var Grapher = function() {
         if (closestPoint.stroke!= -1){ //it found a close enough point
             //update current timestep
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
-            currentI = time;
+            currentTime = time;
             audio.currentTime = time;
             changeSlider(time);
             
             if(!freePosition) {
-                var newTransform = getTransform(currentI);
+                var newTransform = getTransform(currentTime);
                 freePosition = true;
                 animateToPos(Date.now(), 500, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
                     freePosition = false;
@@ -321,24 +284,24 @@ var Grapher = function() {
             }
             else if(audio.paused) { //if it was previously paused, remain paused
                 clearFrame();
-                oneFrame(currentI);
+                oneFrame(currentTime);
             }
         }
     }
     
     function drawScrollBars(tx, ty, z) {
         context.beginPath();
-        context.strokeStyle = 'rgba(0,0,0,0.3)';
+        context.strokeStyle = 'rgba(0,0,0,0.2)';
         context.lineCap = 'round';
         context.lineWidth = 8;
-        scrollBarLeft = (-tx-boundingRect.xmin*xscale*z)/(boundingRect.width*xscale*z)*c.width+10;
-        scrollBarTop = (-ty-boundingRect.ymin*yscale*z)/(boundingRect.height*yscale*z)*c.height+10;
-        scrollBarWidth = xmax/boundingRect.width/z*c.width-20;
-        scrollBarHeight = ymax/boundingRect.height/z*c.height-20;
-        context.moveTo(scrollBarLeft, c.height-10);
-        context.lineTo(scrollBarLeft+scrollBarWidth, c.height-10);
-        context.moveTo(c.width-10, scrollBarTop);
-        context.lineTo(c.width-10, scrollBarTop+scrollBarHeight);
+        scrollBarLeft = (-tx-boundingRect.xmin*xscale*z)/(boundingRect.width*xscale*z)*canvas.width+10;
+        scrollBarTop = (-ty-boundingRect.ymin*yscale*z)/(boundingRect.height*yscale*z)*canvas.height+10;
+        scrollBarWidth = xmax/boundingRect.width/z*canvas.width-20;
+        scrollBarHeight = ymax/boundingRect.height/z*canvas.height-20;
+        context.moveTo(scrollBarLeft, canvas.height-10);
+        context.lineTo(scrollBarLeft+scrollBarWidth, canvas.height-10);
+        context.moveTo(canvas.width-10, scrollBarTop);
+        context.lineTo(canvas.width-10, scrollBarTop+scrollBarHeight);
         context.stroke();
     }
     
@@ -360,15 +323,15 @@ var Grapher = function() {
     function clearFrame() {
         // Use the identity matrix while clearing the canvas
         context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(0, 0, c.width, c.height);
+        context.clearRect(0, 0, canvas.width, canvas.height);
         
         if(discoMode) {
             context.fillStyle = 'rgb('+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+','+Math.round(Math.random()*255)+')';
-            context.fillRect(0,0,c.width,c.height);
+            context.fillRect(0,0,canvas.width,canvas.height);
         }
         
-        translateX = Math.min(Math.max(translateX,c.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale*totalZoom);
-        translateY = Math.min(Math.max(translateY,c.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
+        translateX = Math.min(Math.max(translateX,canvas.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale*totalZoom);
+        translateY = Math.min(Math.max(translateY,canvas.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
         if((audio.paused | freePosition) & totalZoom !== minZoom & !isScreenshot) {
@@ -396,29 +359,27 @@ var Grapher = function() {
         if(!freePosition) {
             var newTransform = {};
             
-            if (dataArray != undefined) {
-                var cameraChanges = dataArray.cameraTransforms;
-                var nextTransform = cameraChanges[cameraChanges.length-1];
-                var previousTransform = cameraChanges[0];
-                for(var i=0; i< cameraChanges.length; i++){
-                    var currentTransform = cameraChanges[i];
-                    if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
-                        previousTransform = currentTransform;
-                    }
-                    if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
-                        nextTransform = currentTransform;
-                    }
+            var cameraChanges = dataArray.cameraTransforms;
+            var nextTransform = cameraChanges[cameraChanges.length-1];
+            var previousTransform = cameraChanges[0];
+            for(var i=0; i< cameraChanges.length; i++){
+                var currentTransform = cameraChanges[i];
+                if (currentTransform.time < time & currentTransform.time > previousTransform.time) {
+                    previousTransform = currentTransform;
                 }
-                newTransform = $.extend(true,{},previousTransform);
-                if (nextTransform.time !== previousTransform.time) {
-                    var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
-                    newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
-                    newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
-                    newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
+                if(currentTransform.time > time & currentTransform.time < nextTransform.time) {
+                    nextTransform = currentTransform;
                 }
-                newTransform.tx = newTransform.tx/newTransform.m11*xscale;
-                newTransform.ty = newTransform.ty/newTransform.m11*yscale;
             }
+            newTransform = $.extend(true,{},previousTransform);
+            if (nextTransform.time !== previousTransform.time) {
+                var interpolatedTime = (time - previousTransform.time)/(nextTransform.time - previousTransform.time);
+                newTransform.m11 = previousTransform.m11+(nextTransform.m11 - previousTransform.m11)*interpolatedTime;
+                newTransform.tx = previousTransform.tx+(nextTransform.tx - previousTransform.tx)*interpolatedTime;
+                newTransform.ty = previousTransform.ty+(nextTransform.ty - previousTransform.ty)*interpolatedTime;
+            }
+            newTransform.tx = newTransform.tx/newTransform.m11*xscale;
+            newTransform.ty = newTransform.ty/newTransform.m11*yscale;
             
             return newTransform;
         }
@@ -429,26 +390,26 @@ var Grapher = function() {
     //executes each frame of the lecture, including visual, slider & audio
     //this is the method that gets called each timestep.
     function graphData(){
-		currentI=audio.currentTime;
-		changeSlider(currentI);
-        if (currentI > furthestpoint){
-            furthestpoint=currentI;
+		currentTime=audio.currentTime;
+		changeSlider(currentTime);
+        if (currentTime > furthestpoint){
+            furthestpoint=currentTime;
         }
         
-        var local = { 'currentTime': parseFloat(currentI), 
+        var local = { 'currentTime': parseFloat(currentTime), 
                      'furthestPoint': parseFloat(furthestpoint)};
         
         localStorage[datafile]=JSON.stringify(local);
         
         if(!freePosition) {
-            var newTransform = getTransform(currentI);
+            var newTransform = getTransform(currentTime);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
             translateY = newTransform.ty;
             displayZoom(totalZoom);
         }
         clearFrame();
-        oneFrame(currentI);
+        oneFrame(currentTime);
         draw = window.requestAnimationFrame(graphData);
 	}
     
@@ -592,16 +553,16 @@ var Grapher = function() {
     //changes where the handle is on the slider and the accompanying timestamp
     //also changes the furthesttime bar
     function changeSlider(current){
-        if (current<=imax){ 
+        if (current<=endTime){ 
             $('#slider').slider('value',current);
             var secondsPassed=parseFloat(current);
             root.find('.time').html(secondsToTimestamp(secondsPassed));
             
             root.find('#totalTime').html(secondsToTimestamp(secondsPassed)+" / ");
-            root.find('#totalTime').append(secondsToTimestamp(imax));
+            root.find('#totalTime').append(secondsToTimestamp(endTime));
             
             //update furthest time bar
-            var percentage = (furthestpoint)/imax * 100;
+            var percentage = (furthestpoint)/endTime * 100;
             $('.tick').css('width',percentage+'%');
             $('.tick').css('left', '0%');//percentage + '%');
             
@@ -609,12 +570,12 @@ var Grapher = function() {
     }
     
     //triggered on every mouse move of the slider
-    //sets currentI, changes lecture to reflect new currentI
+    //sets currentTime, changes lecture to reflect new currentTime
     function sliderTime(){
         var val=$('#slider').slider('value');
-        currentI=val;
+        currentTime=val;
         
-        var newTransform = getTransform(currentI);
+        var newTransform = getTransform(currentTime);
         totalZoom = newTransform.m11;
         translateX = newTransform.tx;
         translateY = newTransform.ty;
@@ -631,7 +592,7 @@ var Grapher = function() {
         if (initialPause){ //if it was paused, don't do anything
             return;
         }
-        if (ui.value == imax){
+        if (ui.value == endTime){
             stop();
             return;
         }
@@ -647,7 +608,6 @@ var Grapher = function() {
     
     //triggered when user scrolls and zoom function is started
     function zoomStart() {
-        wasDragging = true;
         previousX = translateX;
         previousY = translateY;
         previousZoom = totalZoom;
@@ -658,8 +618,8 @@ var Grapher = function() {
         displayZoom(totalZoom);
         
         //zoom in on center of visible portion achieved by extra translations
-        translateX = previousX + (1-totalZoom/previousZoom)*(c.width/2-previousX);
-        translateY = previousY + (1-totalZoom/previousZoom)*(c.height/2-previousY);
+        translateX = previousX + (1-totalZoom/previousZoom)*(canvas.width/2-previousX);
+        translateY = previousY + (1-totalZoom/previousZoom)*(canvas.height/2-previousY);
         if(audio.paused) {
             clearFrame();
             oneFrame(audio.currentTime);
@@ -672,10 +632,10 @@ var Grapher = function() {
         freePosition = false;
         var zoom = getTransform(audio.currentTime).m11;
         freePosition = initialFree;
-        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)',
-                          'transform':totalZoom>zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)'});
-        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)',
-                           'transform':totalZoom<zoom?'scale(1.5) rotate(360deg)':'scale(1) rotate(0deg)'});
+        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
+                          'transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
+                           'transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
     }
     
     function pan(dx, dy) {
@@ -688,125 +648,123 @@ var Grapher = function() {
     }
     
     //triggered when mouse pressed on canvas
-    function dragStart(e) {
-        isDragging = true;
+    function mouseDown(e) {
+        mousePressed = true;
         previousX = e.pageX;
         previousY = e.pageY;
-        wasDragging = false;
-        if(!dragToPan)
+        mouseDragged = false;
+        startedToPan = dragToPan;
+        if(!dragToPan) { // initialize zoom rectangle
             zoomRect.css({visibility: 'visible', top: previousY, left: previousX});
+        }
+        
+        if(fullscreenMode) toggleControlsVisibility(previousY);
     }
     
     //triggered when mouse dragged across canvas
-    function dragging(e) {
+    function mouseMove(e) {
         var x = e.pageX,
             y = e.pageY;
-        if(isDragging) {
+        if(mousePressed) { // dragging motion
             if(!freePosition)
                 setFreePosition(true);
-            wasDragging = true;
-            if(dragToPan) {
+            mouseDragged = true;
+            if(startedToPan) { // in panning mode
                 var newTx = (x-previousX);
                 var newTy = (y-previousY);
                 pan(newTx, newTy);
                 previousX = x;
                 previousY = y;
             }
-            else {
-                zoomRectW = Math.max(offset.left, Math.min(x, offset.left+c.width))-previousX;
-                zoomRectH = Math.max(offset.top, Math.min(y, offset.top+c.height))-previousY;
-                if(zoomRectW/zoomRectH > c.width/c.height) //maintains aspect ratio of zoom region
-                    zoomRectH = c.height/c.width*zoomRectW;
+            else { // in zoom rectangle mode
+                zoomRectW = Math.max(offset.left, Math.min(x, offset.left+canvas.width))-previousX;
+                zoomRectH = Math.max(offset.top, Math.min(y, offset.top+canvas.height))-previousY;
+                if(zoomRectW < 0) {
+                    zoomRect.css('left', previousX+zoomRectW);
+                    zoomRectW *= -1;
+                }
+                if(zoomRectH < 0) {
+                    zoomRect.css('top', previousY+zoomRectH);
+                    zoomRectH *= -1;
+                }
+                if(zoomRectW/zoomRectH > canvas.width/canvas.height) //maintains aspect ratio of zoom region
+                    zoomRectH = canvas.height/canvas.width*zoomRectW;
                 else
-                    zoomRectW = c.width/c.height*zoomRectH;
+                    zoomRectW = canvas.width/canvas.height*zoomRectH;
                 if(audio.paused) {
                     clearFrame();
                     oneFrame(audio.currentTime);
                 }
                 zoomRect.css({width: zoomRectW, height: zoomRectH});
-                if(c.width/Math.abs(zoomRectW/totalZoom) < maxZoom)
+                if(canvas.width/zoomRectW*totalZoom < maxZoom)
                     zoomRect.css('background-color', 'rgba(0,255,0,0.1)');
                 else
                     zoomRect.css('background-color', 'rgba(255,0,0,0.1)');
             }
         }
         
-        //CHANGE THIS - for mouse move to show stuff in fullscreenmode
-        if(fullscreenMode) {
-            if(!controlsVisible & y > $(window).height()-15)
-                animateControls(true);
-            if(controlsVisible & y < $(window).height()-controls.outerHeight(true)-20)
-                animateControls(false);
-            if(!btnsVisible & x > offset.left+c.width)
-                animateBtns(true);
-            if(btnsVisible & x < offset.left+c.width)
-                animateBtns(false);
+        if(fullscreenMode) toggleControlsVisibility(y);
+    }
+    
+    //triggered when mouse released on canvas
+    function mouseUp() {
+        mousePressed = false;
+        
+        if(!startedToPan & mouseDragged) { //zoom in on region
+            var nz = canvas.width/Math.abs(zoomRectW/totalZoom);
+            if(nz < maxZoom) {
+                var nx = -(zoomRect.position().left - offset.left - translateX)/totalZoom*nz;
+                var ny = -(zoomRect.position().top - offset.top - translateY)/totalZoom*nz;
+                animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
+            }
+            else if(audio.paused) {
+                clearFrame();
+                oneFrame(audio.currentTime);
+            }
+            zoomRectW = 0;
+            zoomRectH = 0;
+            zoomRect.css({visibility: 'hidden', height: 0, width: 0});
         }
+        
+        if(!mouseDragged) { // clicked
+            previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
+            previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
+            selectStroke(previousX,previousY);
+        }
+    }
+    
+    // show/hide controls depending on mouse position
+    function toggleControlsVisibility(y) {
+        if(!controlsVisible & y > $(window).height()-15)
+            animateControls(true);
+        if(controlsVisible & y < $(window).height()-controls.outerHeight(true)-20)
+            animateControls(false);
     }
     
     //for fullscreen, animates when the bottom controls come up and down
     function animateControls(show) {
         if(show) {
-            controls.animate({top: (c.height-controls.outerHeight(true))},200);
+            controls.animate({top: (canvas.height-controls.outerHeight(true))},200);
             controlsVisible = true;
         }
         else {
-            controls.animate({top: c.height},200);
+            controls.animate({top: canvas.height},200);
             controlsVisible = false;
         }
     }
     
-    function animateBtns(show) {
-//        if(show) {
-//            $('.sideButtons').animate({opacity: 1},200);
-//            btnsVisible = true;
-//        }
-//        else {
-//            $('.sideButtons').animate({opacity: 0.3},200);
-//            btnsVisible = false;
-//        }
-    }
-    
-    //triggered when mouse released on canvas
-    function dragStop() {
-        if(isDragging) {
-            isDragging = false;
-            
-            if(!dragToPan & wasDragging) { //zoom in on region
-                var nz = c.width/Math.abs(zoomRectW/totalZoom);
-                if(nz < maxZoom) {
-                    if(zoomRectW < 0)   previousX += zoomRectW; // upper left hand corner
-                    if(zoomRectH < 0)   previousY += zoomRectH;
-                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
-                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
-                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
-                }
-                else if(audio.paused) {
-                    clearFrame();
-                    oneFrame(audio.currentTime);
-                }
-                zoomRectW = 0;
-                zoomRectH = 0;
-                zoomRect.css({visibility: 'hidden', height: 0, width: 0});
-            }
-            
-            if(!wasDragging) { // click
-                previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
-                previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
-                selectStroke(previousX,previousY);
-            }
-        }
-    }
-    
-    //animates back to playing position before playing
-    function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback) {
+    //animates to a new transform
+    function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback, bounded) {
         clearTimeout(animateID);
         animating = true;
-        nz = Math.min(Math.max(nz,minZoom),maxZoom);
-        nx = Math.min(Math.max(nx,c.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
-        ny = Math.min(Math.max(ny,c.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
         
-        var interpolatedTime = Math.pow((Date.now() - startTime)/duration-1,5)+1;
+        if(bounded===undefined) {
+            nz = Math.min(Math.max(nz,minZoom),maxZoom);
+            nx = Math.min(Math.max(nx,canvas.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
+            ny = Math.min(Math.max(ny,canvas.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
+        }
+        
+        var interpolatedTime = Math.pow((Date.now() - startTime)/duration-1,5)+1; // quintic easing
         
         if(Date.now()-startTime > duration | (tx === nx & ty === ny & tz === nz)) {
             animating = false;
@@ -825,21 +783,19 @@ var Grapher = function() {
             translateY = ty + (ny - ty)*interpolatedTime;
             
             if(audio.paused) {
-                drawScrollBars(translateX, translateY, totalZoom);
                 displayZoom(totalZoom);
                 clearFrame();
                 oneFrame(audio.currentTime);
             }
             
             animateID = setTimeout(function() {
-                animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback);
+                animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback, true);
             }, 33);
         }
     }
     
     //starts lecture
     function start(){
-        wasDragging = false;
         root.find('.start').css('background-image',
             "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
         $('#slider .ui-slider-handle').css('background','#0b0');
@@ -848,8 +804,6 @@ var Grapher = function() {
         $('#pauseIcon').attr("src",'play_big.png');
         fadeSign('pause_big.png');
         
-//        draw=clearInterval(draw);
-//        draw=setInterval(graphData,50);
         window.cancelAnimationFrame(draw);
         draw = window.requestAnimationFrame(graphData);
     }
@@ -866,13 +820,11 @@ var Grapher = function() {
         $('#pauseIcon').attr("src",'pause_big.png');
         fadeSign('play_big.png');
         
-//        draw=clearInterval(draw);
         window.cancelAnimationFrame(draw);
     }
     
     //stop lecture, clears furthestpoint back to beginning
     function stop(){
-//        draw=clearInterval(draw);
         window.cancelAnimationFrame(draw);
         
         localStorage.removeItem(datafile);
@@ -883,8 +835,6 @@ var Grapher = function() {
         root.find('.video').css('border','1px solid #f88');
         
         furthestpoint=0;
-        
-//        oneFrame(imax);
     }
     
     //animation for the pause/play image that shows up in the middle of the lecture
@@ -923,7 +873,7 @@ var Grapher = function() {
         $('.buttons button').css('background-size',smallButtonWidths-4);
         $('.buttons button').css('margin-top',smallButtonWidths/2-2);
         $('.buttons button').css('border-radius',smallButtonWidths);
-        $('.jumpForward').css('margin-left',smallButtonWidths+4);
+        $('.speedUp').css('margin-left',smallButtonWidths+4);
         
         //set volume button and slider
         var volWidth= vidWidth * 30/575;
@@ -987,14 +937,14 @@ var Grapher = function() {
         if(fullscreenMode) {
             $('body').css('padding',0);
             root.find('.menulink').hide();
-            c.height = windowHeight;
-            c.width = xmax/ymax*c.height;
-            if(c.width > windowWidth) {
-                c.width = windowWidth;
-                c.height = ymax/xmax*c.width;
+            canvas.height = windowHeight;
+            canvas.width = xmax/ymax*canvas.height;
+            if(canvas.width > windowWidth) {
+                canvas.width = windowWidth;
+                canvas.height = ymax/xmax*canvas.width;
             }
-            $('.lecture').css({height: c.height,
-                               width: c.width});
+            $('.lecture').css({height: canvas.height,
+                               width: canvas.width});
             controls.css({position: 'absolute',
                                 top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,
@@ -1003,8 +953,8 @@ var Grapher = function() {
         else {
             $('body').css('padding','');
             root.find('.menulink').show();
-            c.height=ymax * videoDim/scaleFactor;
-            c.width=xmax * videoDim/scaleFactor;
+            canvas.height=ymax * videoDim/scaleFactor;
+            canvas.width=xmax * videoDim/scaleFactor;
             $('.lecture').css({height: 'auto',
                                width: 'auto'});
             controls.css({position: 'absolute',
@@ -1015,43 +965,43 @@ var Grapher = function() {
             $('.sideButtons').css('opacity',1);
         }
         
-        $('.captions').css('width',c.width);
+        $('.captions').css('width',canvas.width);
         $('.captions').css('top',$('.controls').offset().top - 50 + 'px');
         $('.speedDisplay').css('top', -45 + 'px');
-        var fontsize = c.width * 30/575;
+        var fontsize = canvas.width * 30/575;
         if (fontsize > 30 ) fontsize=30; //max font size 30
         $('.speedDisplay').css('font-size', fontsize+'px');
         
-        yscale=(c.height)/ymax;
-        xscale=(c.width)/xmax;
+        yscale=(canvas.height)/ymax;
+        xscale=(canvas.width)/xmax;
         offset = root.find('.video').offset();
-        resizeControls(c.width);
+        resizeControls(canvas.width);
         
-        var onScreenStatusWidth=c.width * 80/575;
-        $('.onScreenStatus').css('margin-top', -c.height/2-onScreenStatusWidth/2);
-        $('.onScreenStatus').css('margin-left',c.width/2-onScreenStatusWidth/2);
+        var onScreenStatusWidth=canvas.width * 80/575;
+        $('.onScreenStatus').css('margin-top', -canvas.height/2-onScreenStatusWidth/2);
+        $('.onScreenStatus').css('margin-left',canvas.width/2-onScreenStatusWidth/2);
         $('#pauseIcon').css('width',onScreenStatusWidth+"px");
         $('#pauseIcon').css('height',onScreenStatusWidth+"px");
         $('.onScreenStatus').css('opacity',".5");
         $('.onScreenStatus').css('visibility',"hidden");
         
-        var sideIncrement = fullscreenMode?c.height/7:c.height/6;
+        var sideIncrement = fullscreenMode?canvas.height/7:canvas.height/6;
         var transBtnDim = sideIncrement/2;
         $('.sideButtons').css({top: (offset.top),
-                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+c.width+10),
+                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+canvas.width+10),
                                height: (transBtnDim*7),
                                width:sideIncrement,'border-radius':transBtnDim});
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
                              margin:transBtnDim/2,
                              'margin-bottom':0});
-        $('#seeAll').css('margin-bottom',transBtnDim);
+        $('#zoomOut').css('margin-bottom',transBtnDim);
         $('.URLinfo').css({left: parseInt($('#timeStampURL').position().left,10) - parseInt($('.URLinfo').css('width'),10),
                            top: parseInt($('#timeStampURL').position().top,10),
                            'border-right-width': transBtnDim+20,height:sideIncrement});
     }
     
-    //custom handler to distinguish between single- and double-click events
+    //custom handler to distinguish between single- and double-click mouse and touch events
     function doubleClickHandler(input) {
         var element = input.element;
         var down = input.down;
@@ -1097,7 +1047,6 @@ var Grapher = function() {
             offClick();
             doubled = false;
             var click = setTimeout(function() {
-                console.log('click');
                 if(!doubled)
                     up();
                 doubled = false;
@@ -1105,7 +1054,6 @@ var Grapher = function() {
                 on();
             },tolerance);
             element.on('mouseup', function() {
-                console.log('doubleclick');
                 clearTimeout(click);
                 double(e, e.target);
                 doubled = true;
@@ -1118,7 +1066,6 @@ var Grapher = function() {
             doubled = false;
             var tap = setTimeout(function() {
                 offClick();
-                console.log('click');
                 if(!doubled)
                     up();
                 doubled = false;
@@ -1127,7 +1074,6 @@ var Grapher = function() {
             },tolerance);
             element.on('touchend', function() {
                 offClick();
-                console.log('doubleclick');
                 clearTimeout(tap);
                 double(e.originalEvent.changedTouches[0], e.target);
                 doubled = true;
@@ -1138,74 +1084,60 @@ var Grapher = function() {
         on();
     }
     
-    function fullscreen(yes) {
-        fullscreenMode = yes;
-        try{
-            if(yes) {
-                try {root[0].mozRequestFullScreen();}
-                catch(e) {root[0].webkitRequestFullScreen();}
-            }
-            else {
-                try {document.mozCancelFullScreen();}
-                catch(e) {document.webkitCancelFullScreen();}
-            }
-        }catch(e){}
+    function setFullscreenMode(on) {
+        fullscreenMode = on;
+        if(on)  root[0].requestFullScreen();
+        else    document.cancelFullScreen();
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
         root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen':'Fullscreen');
         resizeVisuals();
     }
     
+    //controls displays of the speed buttons (fast forward and slow down)
+    //green when it's < or > than 1, none when it ==1, red when <0
+    //also displays total speed on the screen
     function speedIndicators(){
-        console.log(audio.playbackRate);
         $('.speedDisplay').text(Math.round(audio.playbackRate/1*10)/10 +" x");
         if (audio.playbackRate>1){
-            $('.jumpForward').css('border-color','#0e9300');
-            $('.jumpForward').css('opacity','.7');
-            $('.jumpBack').css('border-color','');
-            $('.jumpBack').css('opacity','');
+            $('.speedUp').css('border-color','#0e9300');
+            $('.speedUp').css('opacity','.7');
+            $('.slowDown').css('border-color','');
+            $('.slowDown').css('opacity','');
         } else if (audio.playbackRate < 1 & audio.playbackRate > 0){
-            $('.jumpBack').css('border-color','#0e9300');
-            $('.jumpBack').css('opacity','.7');
-            $('.jumpForward').css('border-color','');
-            $('.jumpForward').css('opacity','');
+            $('.slowDown').css('border-color','#0e9300');
+            $('.slowDown').css('opacity','.7');
+            $('.speedUp').css('border-color','');
+            $('.speedUp').css('opacity','');
         } else if (audio.playbackRate < 0){
-            $('.jumpBack').css('border-color','#f44');
-            $('.jumpBack').css('opacity','.7');
-            $('.jumpForward').css('border-color','');
-            $('.jumpForward').css('opacity','');
+            $('.slowDown').css('border-color','#f44');
+            $('.slowDown').css('opacity','.7');
+            $('.speedUp').css('border-color','');
+            $('.speedUp').css('opacity','');
         } else {
             $('.speedDisplay').text("");
-            $('.jumpBack').css('border-color','');
-            $('.jumpBack').css('opacity','');
-            $('.jumpForward').css('border-color','');
-            $('.jumpForward').css('opacity','');
+            $('.slowDown').css('border-color','');
+            $('.slowDown').css('opacity','');
+            $('.speedUp').css('border-color','');
+            $('.speedUp').css('opacity','');
         }
     }
     
+    //returns the variable value for the variable 'name' from the given url 'data'
+    //if nothing's there, returns -100
     function getURLParameter(name,data) {
         return decodeURI(
             (RegExp('[?|&]'+name + '=' + '(.+?)(&|$)').exec(data)||[,-100])[1]
         );
     }
     
-    function urlExists(url){
-        var http=new XMLHttpRequest();
-        http.open('HEAD',url,false);
-        http.send();
-        return http.status!=404;
-    }
-    
     function setFreePosition(free) {
         freePosition = free;
-//        $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
-//                             '-moz-filter': free?'sepia(100%)':'',
-//                             'filter': free?'sepia(100%)':''});
         $('#revertPos').find('img').attr('src',free?'target.gif':'target.png');
     }
     
-    function animateZoom(nz) {
-        var nx = translateX + (1-nz/totalZoom)*(c.width/2-translateX);
-        var ny = translateY + (1-nz/totalZoom)*(c.height/2-translateY);
+    function animateZoom(nz) { // for zoom buttons
+        var nx = translateX + (1-nz/totalZoom)*(canvas.width/2-translateX);
+        var ny = translateY + (1-nz/totalZoom)*(canvas.height/2-translateY);
         setFreePosition(true);
         animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
     }
@@ -1220,7 +1152,9 @@ var Grapher = function() {
         + "     <input class='start' type='button'/>"
         + " </div>"
         + " <div id='totalTime'></div>"
-        + " <div class='toggleControls'>Drag/Scroll To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
+        + " <div class='toggleControls'>Drag & Scroll Action:"
+        + "     <br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span>"
+        + "     <br/><span id='shiftinstructions'>Hold SHIFT to toggle</span></div>"
         + " <button class='volume'></button>"
         + " <div class='volumeSlider'></div>"
         + "<audio class='audio' preload='auto'>"
@@ -1228,19 +1162,24 @@ var Grapher = function() {
         + "     <source id='lectureAudioOgg' type='audio/ogg'>"
         + "</audio>"
         + "</div>"
-        + "</div>"
-        + "<div class='zoomRect'></div>";
+        + "<div class='zoomRect'></div>"
+        + "</div>";
     exports.initialize = function() {
-        var requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame;
-        window.requestAnimationFrame = requestAnimationFrame;
-        var cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame;
-        window.cancelAnimationFrame = cancelAnimationFrame;
+        $(window).off('doubleclick');
         
         root=$('.pentimento');
         root.append(template);
         zoomRect = root.find('.zoomRect');
         controls = root.find('.controls');
-        root.hide();
+        $('.lecture').hide(); //hide until all data loaded
+        root.append("<br/><div class='loadingMsg'>loading ... </div>");
+        canvas=root.find('.video')[0];
+        context=canvas.getContext('2d');
+        
+        window.requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame;
+        window.cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame;
+        document.cancelFullScreen = document.cancelFullScreen || document.webkitCancelFullScreen || document.mozCancelFullScreen;
+        root[0].requestFullScreen = root[0].requestFullScreen || root[0].webkitRequestFullScreen || root[0].mozRequestFullScreen;
         
         var filename=getURLParameter('n',location.search);
         var t=getURLParameter('t',location.search);
@@ -1249,6 +1188,9 @@ var Grapher = function() {
         
         datafile="lectures/"+filename+".lec";
         audioSource="lectures/"+filename+".mp3";
+        
+        
+        //audio stuff, including volume
         
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
@@ -1260,7 +1202,7 @@ var Grapher = function() {
         $('.volumeSlider').slider({
             max:1,
             min:0,
-            step:.1,
+            step:0.1,
             value:audio.volume,
             range: "min",
             slide: function(event, ui){
@@ -1279,8 +1221,12 @@ var Grapher = function() {
             }
         });
         
-        $('.buttons').append('<button class="jumpBack"></button>');
-        $('.buttons').append('<button class="jumpForward"></button>');
+        //ACTUALLY GETS THE DATA
+        readFile(datafile,getData);
+        
+        //controls
+        $('.buttons').append('<button class="slowDown"></button>');
+        $('.buttons').append('<button class="speedUp"></button>');
         $('.controls').append('<div class="speedDisplay"></div>');
         
         $('#slider').slider({
@@ -1305,36 +1251,69 @@ var Grapher = function() {
                     //only call if it was a user-induced change, not program-induced
         });
         
+        //toggle between panning and zooming actions
+        root.find('#toggleDrag').slider({
+            min: -1, 
+            max: 1, 
+            step: 2, 
+            value: 1,
+            change: function(e, ui) {
+                dragToPan = ui.value > 0;
+                $('.toggleControls #pan').css('color',dragToPan?'#000':'#aaa');
+                $('.toggleControls #zoom').css('color',dragToPan?'#aaa':'#000');
+            }
+        });
+        
         $('#slider').append('<div class="tick ui-widget-content"></div>');
         $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
-        c=root.find('.video')[0];
+        root.find('.toggleControls').on('click', function() {
+            root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value')});
+        });
         
-        context=c.getContext('2d');
+        //WINDOW LISTENERS        
+        //shift to toggle
+        var shiftKeyPressed = false;
+        window.addEventListener('keydown', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16 & !shiftKeyPressed) {
+                root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value'), disabled: true});
+                shiftKeyPressed = true;
+            }
+        });
+        window.addEventListener('keyup', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16) {
+                root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value'), disabled: false});
+                shiftKeyPressed = false;
+            }
+        });
         
-        var doubleClick = doubleClickHandler({
+        doubleClickHandler({
             element: $(window),
             down: function(e) {
-                if(e.target === c)
-                    dragStart(e);
+                if(e.target === canvas)
+                    mouseDown(e);
+                if(e.target !== $('.URLinfo')[0])
+                    $('.URLinfo').css('visibility','hidden');
             },
-            move: dragging,
-            up: dragStop,
+            move: mouseMove,
+            up: mouseUp,
             double: function(e, target) {
-                if(target === c) {
+                if(target === canvas) {
                     setFreePosition(true);
                     
                     var x = e.pageX,
                         y = e.pageY;
-                    isDragging = false;
+                    mousePressed = false;
                     var nz = totalZoom===1?2:1;
                     if(nz === 2) {
-                        previousX = x-c.width/2/nz;
-                        previousY = y-c.height/2/nz;
+                        previousX = x-canvas.width/2/nz;
+                        previousY = y-canvas.height/2/nz;
                     }
                     else {
-                        previousX = x>c.width/2?-c.width:0;
-                        previousY = y>c.height/2?-c.height:0;
+                        previousX = x>canvas.width/2?-canvas.width:0;
+                        previousY = y>canvas.height/2?-canvas.height:0;
                     }
                     var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
                     var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
@@ -1345,7 +1324,7 @@ var Grapher = function() {
             tolerance: 200
         });
         
-        c.addEventListener('mousewheel', function(e){
+        canvas.addEventListener('mousewheel', function(e){
             e.preventDefault();
             e.stopPropagation();
             setFreePosition(true);
@@ -1360,62 +1339,15 @@ var Grapher = function() {
             }
             else
                 pan(e.wheelDeltaX, e.wheelDeltaY);
-            wasDragging = true;
         });
         
-        readFile(datafile,getData);
-        
-        //fast forward & slow down
-        root.find('.jumpForward').on('click', function() {
-            audio.playbackRate += 0.1;
-            audio.defaultPlaybackRate += 0.1;
-            speedIndicators();
-        });
-        root.find('.jumpBack').on('click', function() {
-            audio.playbackRate -= 0.1;
-            audio.defaultPlaybackRate -= 0.1;
-            speedIndicators();
-        });
-        
-        root.find('#toggleDrag').slider({
-            min: -1, max: 1, step: 2, value: 1,
-            slide: function(e, ui) {
-                dragToPan = ui.value > 0;
-                //true if dragging to pan
-                if (dragToPan) {
-                    $('.toggleControls #pan').css('color','#000');
-                    $('.toggleControls #zoom').css('color','#aaa');
-                } else{
-                    $('.toggleControls #pan').css('color','#aaa');
-                    $('.toggleControls #zoom').css('color','#000');
-                }
-            }
-        });
-        
-        //SHIFT TO TOGGLE SCROLL TO ZOOM
-        window.addEventListener('keydown', function(e) {
-            var key = e.keyCode || e.which;
-            if(key === 16) {
-                root.find('#toggleDrag').slider({value: -1, disabled: true});
-                dragToPan = false;
-                root.find('.video').css('cursor', '-webkit-zoom-in');
-            }
-        });
-        window.addEventListener('keyup', function(e) {
-            var key = e.keyCode || e.which;
-            if(key === 16) {
-                root.find('#toggleDrag').slider({value: 1, disabled: false});
-                dragToPan = true;
-                root.find('.video').css('cursor', 'default');
-            }
-        });
-        
+        //side controls
         var sideButtons=$('<div class="sideButtons"></div>');
-        root.append(sideButtons);
+        $('.lecture').append(sideButtons);
         sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
-        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time"><img src="link.png"></img></button>');
@@ -1436,21 +1368,16 @@ var Grapher = function() {
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
-            fullscreen(fullscreenMode);
+            setFullscreenMode(fullscreenMode);
         });
         $('#zoomIn').on('click', function() {
-            animateZoom(Math.min(totalZoom*1.5,maxZoom));
+            animateZoom(Math.min(totalZoom*3/2,maxZoom));
         });
         $('#zoomOut').on('click', function() {
             animateZoom(Math.max(totalZoom*2/3,minZoom));
         });
         
-        audio.addEventListener('play', start);
-        audio.addEventListener('pause', pause);
-        audio.addEventListener('ended', stop);
-        
         $('#timeStampURL').on('click',function(){
-            console.log("timestamp url clicked");
             if ( $('.URLinfo').css('visibility')=='hidden'){
                 $('.URLinfo').css('visibility','visible');
             } else {
@@ -1458,25 +1385,32 @@ var Grapher = function() {
             }
             var url = window.location.origin + window.location.pathname
             url = url + '?n='+ getURLParameter('n',location.search);
-            $('.URLs').val(url+'&t='+Math.round(currentI*100)/100);
+            $('.URLs').val(url+'&t='+Math.round(currentTime*100)/100);
             $('.URLs').select();
         });
         
         $('#screenshotURL').on('click',function(){
             isScreenshot=true;
             clearFrame();
-            oneFrame(currentI);
+            oneFrame(currentTime);
             isScreenshot=false;
-            var dataURL=c.toDataURL("image/png");
+            var dataURL=canvas.toDataURL("image/png");
             window.open(dataURL);
-            fullscreen(false);
+            setFullscreenMode(false);
         });
         
-        $('.captionsOption').on('click',function(){
+        $('.captionsOption').on('click',function(){ //not currently in use
             if ($(this).is(':checked'))
                 $('.captions').css('visibility','visible');
             else $('.captions').css('visibility','hidden');
         });
+        
+        
+        //GENERAL CONTROL LISTENERS
+        
+        audio.addEventListener('play', start);
+        audio.addEventListener('pause', pause);
+        audio.addEventListener('ended', stop);
                 
         root.find('.start').on('click',function() {
             if(audio.paused) {
@@ -1490,6 +1424,19 @@ var Grapher = function() {
             }
         });
         
+        //fast forward & slow down
+        root.find('.speedUp').on('click', function() {
+            audio.playbackRate += 0.1;
+            audio.defaultPlaybackRate += 0.1;
+            speedIndicators();
+        });
+        root.find('.slowDown').on('click', function() {
+            audio.playbackRate -= 0.1;
+            audio.defaultPlaybackRate -= 0.1;
+            speedIndicators();
+        });
+        
+        //keystrokes
         $(document).on('keyup',function(event){
             var keyCode = event.keyCode || event.which;
             console.log(keyCode);
@@ -1500,9 +1447,9 @@ var Grapher = function() {
             if (keyCode===27) { // esc was pressed
                 event.preventDefault();
                 event.stopPropagation();
-                fullscreen(false);
+                setFullscreenMode(false);
             }
-            if(keyCode===68)
+            if(keyCode===68) //d was pressed
                 discoMode = !discoMode;
         });
         
@@ -1510,12 +1457,12 @@ var Grapher = function() {
         
         if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //checking for localstorage data
             var local=JSON.parse(localStorage[datafile]);
-            currentI=local.currentTime;
+            currentTime=local.currentTime;
             furthestpoint=local.furthestPoint;
         }
         
         if (t != -100) { //check if URL came with timestamp
-            currentI=t;
+            currentTime=t;
         }
         
         $(window).on('resize',resizeVisuals);

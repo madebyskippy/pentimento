@@ -24,6 +24,7 @@ var Grapher = function() {
     var offset; //position of canvas
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     var fullscreenMode = false;
+    var embedded = false;
     var controlsVisible = true;
     var freePosition = false;
     var animating = false;
@@ -797,7 +798,7 @@ var Grapher = function() {
     //starts lecture
     function start(){
         root.find('.start').css('background-image',
-            "url('http://web.mit.edu/lilis/www/videolec/pause.png')");
+            "url('pause.png')");
         $('#slider .ui-slider-handle').css('background','#0b0');
         root.find('.video').css('border','1px solid #eee');
         
@@ -933,22 +934,28 @@ var Grapher = function() {
             var scaleFactor=xmax; //using width to scale
         }
         
-        if(fullscreenMode) {
+        if(fullscreenMode | embedded) {
             $('body').css('padding',0);
             root.find('.menulink').hide();
             root.find('.pentimentoDialog').hide();
-            canvas.height = windowHeight;
-            canvas.width = xmax/ymax*canvas.height;
-            if(canvas.width > windowWidth) {
-                canvas.width = windowWidth;
-                canvas.height = ymax/xmax*canvas.width;
+            if(fullscreenMode) {
+                canvas.height = windowHeight;
+                canvas.width = xmax/ymax*canvas.height;
+                if(canvas.width > windowWidth) {
+                    canvas.width = windowWidth;
+                    canvas.height = ymax/xmax*canvas.width;
+                }
+            }
+            else {
+                canvas.height = windowHeight-controls.outerHeight(true);
+                canvas.width = xmax/ymax*canvas.height;
             }
             $('.lecture').css({height: canvas.height,
-                               width: canvas.width});
+                               width: canvas.width,margin: embedded?0:'auto auto'});
             controls.css({position: 'absolute',
                                 top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,
-                                'background-color':'rgba(245,245,245,0.9)'});
+                                'background-color':fullscreenMode?'rgba(245,245,245,0.9)':''});
         }
         else {
             $('body').css('padding','');
@@ -990,7 +997,7 @@ var Grapher = function() {
         var sideIncrement = fullscreenMode?canvas.height/7:canvas.height/6;
         var transBtnDim = sideIncrement/2;
         $('.sideButtons').css({top: (offset.top),
-                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+canvas.width+10),
+                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+canvas.width+(embedded?0:10)),
                                height: (transBtnDim*7),
                                width:sideIncrement,
                                'border-radius':transBtnDim,
@@ -1184,6 +1191,7 @@ var Grapher = function() {
         var filename=getURLParameter('n',location.search);
         var t=getURLParameter('t',location.search);
         var end=getURLParameter('end',location.search);
+        embedded = getURLParameter('embed',location.search)==1;
         console.log(filename,t,end);
         
         datafile="lectures/"+filename+".lec";

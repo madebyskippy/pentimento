@@ -160,13 +160,13 @@ input[type='button']:focus{
     opacity:1;
 }
 
-.jumpBack{
+.slowDown{
     background-image: url('slow.png');
     width:25px;
     margin:1px;
 }
 
-.jumpForward{
+.speedUp{
     background-image: url('ff.png');
     width:25px;
     margin:1px;
@@ -207,6 +207,11 @@ input[type='button']:focus{
     float:right;
     font-size:12px;
     margin-top:10px;
+}
+
+.toggleControls #shiftinstructions{
+    font-size:10px;
+    color:#aaa;
 }
 
 #toggleDrag{

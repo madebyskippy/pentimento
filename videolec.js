@@ -199,7 +199,7 @@ var Grapher = function() {
                     var newcosb = (Math.pow(ab,2)+Math.pow(bc,2)-Math.pow(ac,2))/(2*ab*bc);
                     if(!isNaN(newcosb) & Math.abs(newcosb) > 0.3) {
                         if(cosb !== undefined & newcosb/cosb <= 0) {
-                            json.visuals[i].vertices[j].break = true;
+                            point.break = true;
                         }
                         cosb = newcosb;
                     }
@@ -237,7 +237,6 @@ var Grapher = function() {
         xmax=dataArray.width;
         ymax=dataArray.height;
         $('#slider').slider("option","max",endTime);
-        slider.max=endTime;
         $('#totalTime').html("0:00 / "+secondsToTimestamp(endTime));
         dataArray = preProcess(dataArray);
         
@@ -668,10 +667,10 @@ var Grapher = function() {
         freePosition = false;
         var zoom = getTransform(audio.currentTime).m11;
         freePosition = initialFree;
-        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(2) rotate(360deg)':'scale(1) rotate(0deg)',
-                          'transform':totalZoom>zoom?'scale(2) rotate(360deg)':'scale(1) rotate(0deg)'});
-        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(2) rotate(360deg)':'scale(1) rotate(0deg)',
-                           'transform':totalZoom<zoom?'scale(2) rotate(360deg)':'scale(1) rotate(0deg)'});
+        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
+                          'transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
+                           'transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
     }
     
     function pan(dx, dy) {
@@ -684,34 +683,35 @@ var Grapher = function() {
     }
     
     //triggered when mouse pressed on canvas
-    function dragStart(e) {
+    function mouseDown(e) {
         mousePressed = true;
         previousX = e.pageX;
         previousY = e.pageY;
         mouseDragged = false;
-        startedToPan = true;
-        if(!dragToPan) {
+        startedToPan = dragToPan;
+        if(!dragToPan) { // initialize zoom rectangle
             zoomRect.css({visibility: 'visible', top: previousY, left: previousX});
-            startedToPan = false;
         }
+        
+        if(fullscreenMode) toggleControlsVisibility(previousY);
     }
     
     //triggered when mouse dragged across canvas
-    function dragging(e) {
+    function mouseMove(e) {
         var x = e.pageX,
             y = e.pageY;
-        if(mousePressed) {
+        if(mousePressed) { // dragging motion
             if(!freePosition)
                 setFreePosition(true);
             mouseDragged = true;
-            if(startedToPan) {
+            if(startedToPan) { // in panning mode
                 var newTx = (x-previousX);
                 var newTy = (y-previousY);
                 pan(newTx, newTy);
                 previousX = x;
                 previousY = y;
             }
-            else {
+            else { // in zoom rectangle mode
                 zoomRectW = Math.max(offset.left, Math.min(x, offset.left+canvas.width))-previousX;
                 zoomRectH = Math.max(offset.top, Math.min(y, offset.top+canvas.height))-previousY;
                 if(zoomRectW < 0) {
@@ -738,42 +738,42 @@ var Grapher = function() {
             }
         }
         
-        //CHANGE THIS - for mouse move to show stuff in fullscreenmode
-        if(fullscreenMode) {
-            if(!controlsVisible & y > $(window).height()-15)
-                animateControls(true);
-            if(controlsVisible & y < $(window).height()-controls.outerHeight(true)-20)
-                animateControls(false);
-        }
+        if(fullscreenMode) toggleControlsVisibility(y);
     }
     
     //triggered when mouse released on canvas
-    function dragStop() {
-        if(mousePressed) {
-            mousePressed = false;
-            
-            if(!startedToPan & mouseDragged) { //zoom in on region
-                var nz = canvas.width/Math.abs(zoomRectW/totalZoom);
-                if(nz < maxZoom) {
-                    var nx = -(zoomRect.position().left - offset.left - translateX)/totalZoom*nz;
-                    var ny = -(zoomRect.position().top - offset.top - translateY)/totalZoom*nz;
-                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
-                }
-                else if(audio.paused) {
-                    clearFrame();
-                    oneFrame(audio.currentTime);
-                }
-                zoomRectW = 0;
-                zoomRectH = 0;
-                zoomRect.css({visibility: 'hidden', height: 0, width: 0});
+    function mouseUp() {
+        mousePressed = false;
+        
+        if(!startedToPan & mouseDragged) { //zoom in on region
+            var nz = canvas.width/Math.abs(zoomRectW/totalZoom);
+            if(nz < maxZoom) {
+                var nx = -(zoomRect.position().left - offset.left - translateX)/totalZoom*nz;
+                var ny = -(zoomRect.position().top - offset.top - translateY)/totalZoom*nz;
+                animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
             }
-            
-            if(!mouseDragged) { // click
-                previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
-                previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
-                selectStroke(previousX,previousY);
+            else if(audio.paused) {
+                clearFrame();
+                oneFrame(audio.currentTime);
             }
+            zoomRectW = 0;
+            zoomRectH = 0;
+            zoomRect.css({visibility: 'hidden', height: 0, width: 0});
         }
+        
+        if(!mouseDragged) { // clicked
+            previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
+            previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
+            selectStroke(previousX,previousY);
+        }
+    }
+    
+    // show/hide controls depending on mouse position
+    function toggleControlsVisibility(y) {
+        if(!controlsVisible & y > $(window).height()-15)
+            animateControls(true);
+        if(controlsVisible & y < $(window).height()-controls.outerHeight(true)-20)
+            animateControls(false);
     }
     
     //for fullscreen, animates when the bottom controls come up and down
@@ -788,15 +788,18 @@ var Grapher = function() {
         }
     }
     
-    //animates back to playing position before playing
-    function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback) {
+    //animates to a new transform
+    function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback, bounded) {
         clearTimeout(animateID);
         animating = true;
-        nz = Math.min(Math.max(nz,minZoom),maxZoom);
-        nx = Math.min(Math.max(nx,canvas.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
-        ny = Math.min(Math.max(ny,canvas.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
         
-        var interpolatedTime = Math.pow((Date.now() - startTime)/duration-1,5)+1;
+        if(bounded===undefined) {
+            nz = Math.min(Math.max(nz,minZoom),maxZoom);
+            nx = Math.min(Math.max(nx,canvas.width-boundingRect.xmax*xscale*nz),-boundingRect.xmin*xscale);
+            ny = Math.min(Math.max(ny,canvas.height-boundingRect.ymax*yscale*nz),-boundingRect.ymin*yscale);
+        }
+        
+        var interpolatedTime = Math.pow((Date.now() - startTime)/duration-1,5)+1; // quintic easing
         
         if(Date.now()-startTime > duration | (tx === nx & ty === ny & tz === nz)) {
             animating = false;
@@ -815,14 +818,13 @@ var Grapher = function() {
             translateY = ty + (ny - ty)*interpolatedTime;
             
             if(audio.paused) {
-                drawScrollBars(translateX, translateY, totalZoom);
                 displayZoom(totalZoom);
                 clearFrame();
                 oneFrame(audio.currentTime);
             }
             
             animateID = setTimeout(function() {
-                animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback);
+                animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback, true);
             }, 33);
         }
     }
@@ -906,7 +908,7 @@ var Grapher = function() {
         $('.buttons button').css('background-size',smallButtonWidths-4);
         $('.buttons button').css('margin-top',smallButtonWidths/2-2);
         $('.buttons button').css('border-radius',smallButtonWidths);
-        $('.jumpForward').css('margin-left',smallButtonWidths+4);
+        $('.speedUp').css('margin-left',smallButtonWidths+4);
         
         //set volume button and slider
         var volWidth= vidWidth * 30/575;
@@ -1028,13 +1030,13 @@ var Grapher = function() {
                              width:transBtnDim,
                              margin:transBtnDim/2,
                              'margin-bottom':0});
-        $('#seeAll').css('margin-bottom',transBtnDim);
+        $('#zoomOut').css('margin-bottom',transBtnDim);
         $('.URLinfo').css({left: parseInt($('#timeStampURL').position().left,10) - parseInt($('.URLinfo').css('width'),10),
                            top: parseInt($('#timeStampURL').position().top,10),
                            'border-right-width': transBtnDim+20,height:sideIncrement});
     }
     
-    //custom handler to distinguish between single- and double-click events
+    //custom handler to distinguish between single- and double-click mouse and touch events
     function doubleClickHandler(input) {
         var element = input.element;
         var down = input.down;
@@ -1117,12 +1119,10 @@ var Grapher = function() {
         on();
     }
     
-    function fullscreen(yes) {
-        fullscreenMode = yes;
-        if(yes)
-            root[0].requestFullScreen();
-        else
-            document.cancelFullScreen();
+    function setFullscreenMode(on) {
+        fullscreenMode = on;
+        if(on)  root[0].requestFullScreen();
+        else    document.cancelFullScreen();
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
         root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen':'Fullscreen');
         resizeVisuals();
@@ -1131,26 +1131,26 @@ var Grapher = function() {
     function speedIndicators(){
         $('.speedDisplay').text(Math.round(audio.playbackRate/1*10)/10 +" x");
         if (audio.playbackRate>1){
-            $('.jumpForward').css('border-color','#0e9300');
-            $('.jumpForward').css('opacity','.7');
-            $('.jumpBack').css('border-color','');
-            $('.jumpBack').css('opacity','');
+            $('.speedUp').css('border-color','#0e9300');
+            $('.speedUp').css('opacity','.7');
+            $('.slowDown').css('border-color','');
+            $('.slowDown').css('opacity','');
         } else if (audio.playbackRate < 1 & audio.playbackRate > 0){
-            $('.jumpBack').css('border-color','#0e9300');
-            $('.jumpBack').css('opacity','.7');
-            $('.jumpForward').css('border-color','');
-            $('.jumpForward').css('opacity','');
+            $('.slowDown').css('border-color','#0e9300');
+            $('.slowDown').css('opacity','.7');
+            $('.speedUp').css('border-color','');
+            $('.speedUp').css('opacity','');
         } else if (audio.playbackRate < 0){
-            $('.jumpBack').css('border-color','#f44');
-            $('.jumpBack').css('opacity','.7');
-            $('.jumpForward').css('border-color','');
-            $('.jumpForward').css('opacity','');
+            $('.slowDown').css('border-color','#f44');
+            $('.slowDown').css('opacity','.7');
+            $('.speedUp').css('border-color','');
+            $('.speedUp').css('opacity','');
         } else {
             $('.speedDisplay').text("");
-            $('.jumpBack').css('border-color','');
-            $('.jumpBack').css('opacity','');
-            $('.jumpForward').css('border-color','');
-            $('.jumpForward').css('opacity','');
+            $('.slowDown').css('border-color','');
+            $('.slowDown').css('opacity','');
+            $('.speedUp').css('border-color','');
+            $('.speedUp').css('opacity','');
         }
     }
     
@@ -1172,7 +1172,7 @@ var Grapher = function() {
         $('#revertPos').find('img').attr('src',free?'target.gif':'target.png');
     }
     
-    function animateZoom(nz) {
+    function animateZoom(nz) { // for zoom buttons
         var nx = translateX + (1-nz/totalZoom)*(canvas.width/2-translateX);
         var ny = translateY + (1-nz/totalZoom)*(canvas.height/2-translateY);
         setFreePosition(true);
@@ -1189,7 +1189,9 @@ var Grapher = function() {
         + "     <input class='start' type='button'/>"
         + " </div>"
         + " <div id='totalTime'></div>"
-        + " <div class='toggleControls' title='Or SHIFT-drag/scroll'>Drag/Scroll To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
+        + " <div class='toggleControls'>Drag & Scroll Action:"
+        + "     <br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span>"
+        + "     <br/><span id='shiftinstructions'>Hold SHIFT to toggle</span></div>"
         + " <button class='volume'></button>"
         + " <div class='volumeSlider'></div>"
         + "<audio class='audio' preload='auto'>"
@@ -1231,7 +1233,7 @@ var Grapher = function() {
         $('.volumeSlider').slider({
             max:1,
             min:0,
-            step:.1,
+            step:0.1,
             value:audio.volume,
             range: "min",
             slide: function(event, ui){
@@ -1250,8 +1252,8 @@ var Grapher = function() {
             }
         });
         
-        $('.buttons').append('<button class="jumpBack"></button>');
-        $('.buttons').append('<button class="jumpForward"></button>');
+        $('.buttons').append('<button class="slowDown"></button>');
+        $('.buttons').append('<button class="speedUp"></button>');
         $('.controls').append('<div class="speedDisplay"></div>');
         
         $('#slider').slider({
@@ -1283,16 +1285,16 @@ var Grapher = function() {
         
         context=canvas.getContext('2d');
         
-        var doubleClick = doubleClickHandler({
+        doubleClickHandler({
             element: $(window),
             down: function(e) {
                 if(e.target === canvas)
-                    dragStart(e);
+                    mouseDown(e);
                 if(e.target !== $('.URLinfo')[0])
                     $('.URLinfo').css('visibility','hidden');
             },
-            move: dragging,
-            up: dragStop,
+            move: mouseMove,
+            up: mouseUp,
             double: function(e, target) {
                 if(target === canvas) {
                     setFreePosition(true);
@@ -1338,50 +1340,43 @@ var Grapher = function() {
         readFile(datafile,getData);
         
         //fast forward & slow down
-        root.find('.jumpForward').on('click', function() {
+        root.find('.speedUp').on('click', function() {
             audio.playbackRate += 0.1;
             audio.defaultPlaybackRate += 0.1;
             speedIndicators();
         });
-        root.find('.jumpBack').on('click', function() {
+        root.find('.slowDown').on('click', function() {
             audio.playbackRate -= 0.1;
             audio.defaultPlaybackRate -= 0.1;
             speedIndicators();
         });
         
+        //toggle between panning and zooming actions
         root.find('#toggleDrag').slider({
             min: -1, max: 1, step: 2, value: 1,
             change: function(e, ui) {
                 dragToPan = ui.value > 0;
-                //true if dragging to pan
-                if (dragToPan) {
-                    $('.toggleControls #pan').css('color','#000');
-                    $('.toggleControls #zoom').css('color','#aaa');
-                } else{
-                    $('.toggleControls #pan').css('color','#aaa');
-                    $('.toggleControls #zoom').css('color','#000');
-                }
+                $('.toggleControls #pan').css('color',dragToPan?'#000':'#aaa');
+                $('.toggleControls #zoom').css('color',dragToPan?'#aaa':'#000');
             }
         });
         root.find('.toggleControls').on('click', function() {
             root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value')});
         });
-        
-        //SHIFT TO TOGGLE SCROLL TO ZOOM
+        //shift to toggle
+        var shiftKeyPressed = false;
         window.addEventListener('keydown', function(e) {
             var key = e.keyCode || e.which;
-            if(key === 16) {
-                root.find('#toggleDrag').slider({value: -1, disabled: true});
-                dragToPan = false;
-                root.find('.video').css('cursor', '-webkit-zoom-in');
+            if(key === 16 & !shiftKeyPressed) {
+                root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value'), disabled: true});
+                shiftKeyPressed = true;
             }
         });
         window.addEventListener('keyup', function(e) {
             var key = e.keyCode || e.which;
             if(key === 16) {
-                root.find('#toggleDrag').slider({value: 1, disabled: false});
-                dragToPan = true;
-                root.find('.video').css('cursor', 'default');
+                root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value'), disabled: false});
+                shiftKeyPressed = false;
             }
         });
         
@@ -1389,8 +1384,8 @@ var Grapher = function() {
         root.append(sideButtons);
         sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
-        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time"><img src="link.png"></img></button>');
@@ -1411,10 +1406,10 @@ var Grapher = function() {
         });
         $('#fullscreen').on('click', function() {
             fullscreenMode = !fullscreenMode;
-            fullscreen(fullscreenMode);
+            setFullscreenMode(fullscreenMode);
         });
         $('#zoomIn').on('click', function() {
-            animateZoom(Math.min(totalZoom*1.5,maxZoom));
+            animateZoom(Math.min(totalZoom*3/2,maxZoom));
         });
         $('#zoomOut').on('click', function() {
             animateZoom(Math.max(totalZoom*2/3,minZoom));
@@ -1443,7 +1438,7 @@ var Grapher = function() {
             isScreenshot=false;
             var dataURL=canvas.toDataURL("image/png");
             window.open(dataURL);
-            fullscreen(false);
+            setFullscreenMode(false);
         });
         
         $('.captionsOption').on('click',function(){
@@ -1474,7 +1469,7 @@ var Grapher = function() {
             if (keyCode===27) { // esc was pressed
                 event.preventDefault();
                 event.stopPropagation();
-                fullscreen(false);
+                setFullscreenMode(false);
             }
             if(keyCode===68)
                 discoMode = !discoMode;

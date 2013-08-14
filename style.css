@@ -86,18 +86,15 @@ input[type='button']{
 
 input[type='button']:hover{
     border:0px #aaa solid;
-    border-radius:25px;
     opacity: .7;
 }
 
 input[type='button']:active{
     border:0px #444 solid;
-    border-radius:25px;
     opacity:1;
 }
 input[type='button']:focus{
     border:0px #444 solid;
-    border-radius:25px;
     opacity:1;
 }
 
@@ -146,7 +143,8 @@ input[type='button']:focus{
     background-repeat:no-repeat;
     position:absolute;
     opacity:0.5;
-    border: 2px #fff solid;
+    border: 0;
+    border-radius:0;
     background-color:transparent;
 }
 

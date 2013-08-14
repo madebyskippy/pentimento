@@ -274,3 +274,7 @@ input[type='button']:focus{
     position:absolute;
     background: rgba(235,235,235,0.1);
 }
+
+.ui-dialog{
+    z-index: 9000;
+}

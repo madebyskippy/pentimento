@@ -190,8 +190,6 @@ var Grapher = function() {
         resizeVisuals();
         numStrokes=json.visuals.length;
         
-        console.log(json);
-        
         return json;
     }
     
@@ -267,7 +265,6 @@ var Grapher = function() {
             }
         }
         
-        console.log(closestPoint, initialPause);
         if (closestPoint.stroke!= -1){ //it found a close enough point
             //update current timestep
             var time=parseFloat(dataArray.visuals[closestPoint.stroke].vertices[0].t);
@@ -936,7 +933,7 @@ var Grapher = function() {
         
         if(fullscreenMode) {
             $('body').css('padding',0);
-            root.find('.menulink').hide();
+            root.find('.menulink .pentimentoDialog').hide();
             canvas.height = windowHeight;
             canvas.width = xmax/ymax*canvas.height;
             if(canvas.width > windowWidth) {
@@ -952,7 +949,7 @@ var Grapher = function() {
         }
         else {
             $('body').css('padding','');
-            root.find('.menulink').show();
+            root.find('.menulink .pentimentoDialog').show();
             canvas.height=ymax * videoDim/scaleFactor;
             canvas.width=xmax * videoDim/scaleFactor;
             $('.lecture').css({height: 'auto',
@@ -963,6 +960,7 @@ var Grapher = function() {
                                 left: ($('.video').offset().left+'px'),
                                 'background-color':''});
             $('.sideButtons').css('opacity',1);
+            $('.pentimentoDialog').css('left',canvas.width-$('.pentimentoDialog').width()-$('.menulink').width());
         }
         
         $('.captions').css('width',canvas.width);
@@ -1047,9 +1045,7 @@ var Grapher = function() {
             offClick();
             doubled = false;
             var click = setTimeout(function() {
-                if(!doubled)
-                    up();
-                doubled = false;
+                up();
                 element.off('mouseup');
                 on();
             },tolerance);
@@ -1066,9 +1062,7 @@ var Grapher = function() {
             doubled = false;
             var tap = setTimeout(function() {
                 offClick();
-                if(!doubled)
-                    up();
-                doubled = false;
+                up();
                 element.off('touchend');
                 on();
             },tolerance);
@@ -1089,7 +1083,7 @@ var Grapher = function() {
         if(on)  root[0].requestFullScreen();
         else    document.cancelFullScreen();
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
-        root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen':'Fullscreen');
+        root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen (ESC)':'Fullscreen (F)');
         resizeVisuals();
     }
     
@@ -1142,7 +1136,8 @@ var Grapher = function() {
         animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
     }
     
-    var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
+    var template="<a class='menulink' href='index.html'>back to menu</a>"
+        + "<a class='pentimentoDialog' href='#' style='position:relative;'>about</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<br> <div class='captions'>test captions</div>"
@@ -1163,7 +1158,16 @@ var Grapher = function() {
         + "</audio>"
         + "</div>"
         + "<div class='zoomRect'></div>"
-        + "</div>";
+        + "<div id='description-dialog'>"
+        + "     <h3>Pentimento Player</h3>"
+        + "     <ul><li>Click on a stroke to go to that point in the video</li>"
+        + "     <li>Drag, scroll, or use arrow keys to pan around</li>"
+        + "     <li>Shift-Scroll to zoom</li>"
+        + "     <li>Shift-Arrow Key to pan faster</li>"
+        + "     <li>Keyboard shortcuts appear on hover</li>"
+        + "</ul></div>"
+        + "</div>"
+    ;
     exports.initialize = function() {
         $(window).off('doubleclick');
         
@@ -1175,6 +1179,7 @@ var Grapher = function() {
         root.append("<br/><div class='loadingMsg'>loading ... </div>");
         canvas=root.find('.video')[0];
         context=canvas.getContext('2d');
+        $('.toggleControls').hide();
         
         window.requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame;
         window.cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame;
@@ -1344,13 +1349,13 @@ var Grapher = function() {
         //side controls
         var sideButtons=$('<div class="sideButtons"></div>');
         $('.lecture').append(sideButtons);
-        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
-        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time"><img src="link.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In (+)"><img src="plus.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus (Enter)"><img src="target.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View (A)"><img src="seeall.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out (-)"><img src="minus.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen (F)"><img src="fs.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot (S)"><img src="camera.png"></img></button>');
+        sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="link.png"></img></button>');
         sideButtons.append(" <div class='URLinfo'>Link to the lecture at the current time: <br/><textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea></div>");
         
         
@@ -1405,12 +1410,24 @@ var Grapher = function() {
             else $('.captions').css('visibility','hidden');
         });
         
-        
         //GENERAL CONTROL LISTENERS
         
         audio.addEventListener('play', start);
         audio.addEventListener('pause', pause);
         audio.addEventListener('ended', stop);
+        
+        $('#description-dialog').dialog({
+            modal: true,
+            buttons: {
+                OK: function() {
+                    $(this).dialog('close');
+                }
+            }
+        });
+        $('#description-dialog').dialog('close');
+        $('.pentimentoDialog').on('click',function(){
+            $('#description-dialog').dialog('open');
+        });
                 
         root.find('.start').on('click',function() {
             if(audio.paused) {
@@ -1451,6 +1468,27 @@ var Grapher = function() {
             }
             if(keyCode===68) //d was pressed
                 discoMode = !discoMode;
+            if(keyCode===13)
+                root.find('#revertPos').click();
+            if(keyCode===187)
+                root.find('#zoomIn').click();
+            if(keyCode===189)
+                root.find('#zoomOut').click();
+            if(keyCode===65)
+                root.find('#seeAll').click();
+            if(keyCode===70)
+                root.find('#fullscreen').click();
+            if(keyCode===83)
+                root.find('#screenshotURL').click();
+            if(keyCode===76)
+                root.find('#timeStampURL').click();
+        });
+        $(document).on('keydown',function(event){ // for keys which can be pressed and held
+            var keyCode = event.keyCode || event.which;
+            if(keyCode>=37 & keyCode <= 40) { // an arrow key
+                var increment = event.shiftKey?20:5;
+                pan(keyCode%2*(38-keyCode)*increment, (keyCode+1)%2*(39-keyCode)*increment);
+            }
         });
         
         console.log(localStorage);
@@ -1487,24 +1525,5 @@ var Grapher = function() {
 
     if ('jQuery' in window) {
       createGrapher(window.jQuery);
-    } else {
-        // Add jQuery to the HEAD and then start polling to see when it is there
-        var scr = document.createElement('script');
-        scr.setAttribute('src',
-                    'http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js');
-        document.head.appendChild(scr);
-        
-        //script . onload (do this stuff) instead of doing a setInterval
-        
-        var t = setInterval(function() {
-            if ('jQuery' in window) {
-                var scr2 = document.createElement('script');
-                scr2.setAttribute('src',
-                    'http://code.jquery.com/ui/1.10.3/jquery-ui.js');
-                document.head.appendChild(scr2);
-                clearInterval(t); // Stop polling 
-                createGrapher();
-            }
-        }, 50);
     }
 })();

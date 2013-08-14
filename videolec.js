@@ -242,7 +242,7 @@ var Grapher = function() {
         $('#totalTime').html("0:00 / "+secondsToTimestamp(imax));
         dataArray = preProcess(dataArray);
         
-        if (localStorage[datafile]!==undefined){ //if there is data in the localstorage
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //if there is data in the localstorage
             var newTransform = getTransform(currentI);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -251,9 +251,13 @@ var Grapher = function() {
             clearFrame();
             changeSlider(currentI);
             oneFrame(currentI);
-            audio.addEventListener('canplay', function(){
+            if(audio.readyState === 4)
                 audio.currentTime=currentI;
-            });
+            else {
+                audio.addEventListener('canplay', function() {
+                    audio.currentTime=currentI;
+                });
+            }
         }
 
     }
@@ -266,7 +270,7 @@ var Grapher = function() {
 			if (txtFile.readyState != 4) {return;}  // document is ready to parse.	
 			if (txtFile.status != 200 && txtFile.status != 304) {return;}  // file is found
 			callback(txtFile);
-		}
+		};
 		if (txtFile.readyState == 4) return;
 		txtFile.send(null);
 	}
@@ -618,12 +622,12 @@ var Grapher = function() {
         clearFrame();
         oneFrame(val);
         changeSlider(val);
-        audio.currentTime=val;
     }
     
     //triggered after a user stops sliding
     //controls if lecture goes back to playing or not
     function sliderStop(event, ui){
+        audio.currentTime=ui.value;
         if (initialPause){ //if it was paused, don't do anything
             return;
         }
@@ -822,6 +826,7 @@ var Grapher = function() {
             
             if(audio.paused) {
                 drawScrollBars(translateX, translateY, totalZoom);
+                displayZoom(totalZoom);
                 clearFrame();
                 oneFrame(audio.currentTime);
             }
@@ -957,7 +962,7 @@ var Grapher = function() {
         displayZoom(totalZoom);
         
         clearFrame();
-        oneFrame(currentI);
+        oneFrame(audio.currentTime);
     }
     
     function resizeVisuals(){
@@ -1032,20 +1037,18 @@ var Grapher = function() {
         
         var sideIncrement = fullscreenMode?c.height/7:c.height/6;
         var transBtnDim = sideIncrement/2;
+        $('.sideButtons').css({top: (offset.top),
+                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+c.width+10),
+                               height: (transBtnDim*7),
+                               width:sideIncrement,'border-radius':transBtnDim});
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
-                             left:(fullscreenMode?windowWidth-1.5*transBtnDim:offset.left+c.width+transBtnDim/2)});
-        $('#zoomIn').css({top: (offset.top+0.25*sideIncrement)});
-        $('#revertPos').css({top: (offset.top+sideIncrement)});
-        $('#zoomOut').css({top: (offset.top+1.625*sideIncrement)});
-        $('#seeAll').css({top: (offset.top+2.25*sideIncrement)});
-        $('#fullscreen').css({top: (offset.top+3.25*sideIncrement)});
-        $('#screenshotURL').css({top: (offset.top+4.25*sideIncrement)});
-        $('#timeStampURL').css({top: (offset.top+5.25*sideIncrement)});
-        $('.URLinfo').css({left: parseInt($('.transBtns').css('left'),10) - parseInt($('.URLinfo').css('width'),10) - 20,
-                           top: parseInt($('#timeStampURL').css('top'),10)-5,
-                           height: transBtnDim,
-                           'border-right-width': transBtnDim+20});
+                             margin:transBtnDim/2,
+                             'margin-bottom':0});
+        $('#seeAll').css('margin-bottom',transBtnDim);
+        $('.URLinfo').css({left: parseInt($('#timeStampURL').position().left,10) - parseInt($('.URLinfo').css('width'),10),
+                           top: parseInt($('#timeStampURL').position().top,10),
+                           'border-right-width': transBtnDim+20,height:sideIncrement});
     }
     
     //custom handler to distinguish between single- and double-click events
@@ -1194,11 +1197,10 @@ var Grapher = function() {
     
     function setFreePosition(free) {
         freePosition = free;
-        $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
-                             '-moz-filter': free?'sepia(100%)':'',
-                             'filter': free?'sepia(100%)':'',
-                             '-webkit-transform': free?'scale(1.2)':'',
-                             'transform': free?'scale(1.2)':''});
+//        $('#revertPos').css({'-webkit-filter': free?'sepia(100%)':'',
+//                             '-moz-filter': free?'sepia(100%)':'',
+//                             'filter': free?'sepia(100%)':''});
+        $('#revertPos').find('img').attr('src',free?'target.gif':'target.png');
     }
     
     function animateZoom(nz) {
@@ -1221,7 +1223,7 @@ var Grapher = function() {
         + " <div class='toggleControls'>Drag/Scroll To:<br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span></div>"
         + " <button class='volume'></button>"
         + " <div class='volumeSlider'></div>"
-        + "<audio class='audio' preload='metadata'>"
+        + "<audio class='audio' preload='auto'>"
         + "     <source id='lectureAudio' type='audio/mpeg'>"
         + "     <source id='lectureAudioOgg' type='audio/ogg'>"
         + "</audio>"
@@ -1366,10 +1368,12 @@ var Grapher = function() {
         //fast forward & slow down
         root.find('.jumpForward').on('click', function() {
             audio.playbackRate += 0.1;
+            audio.defaultPlaybackRate += 0.1;
             speedIndicators();
         });
         root.find('.jumpBack').on('click', function() {
             audio.playbackRate -= 0.1;
+            audio.defaultPlaybackRate -= 0.1;
             speedIndicators();
         });
         
@@ -1408,12 +1412,12 @@ var Grapher = function() {
         
         var sideButtons=$('<div class="sideButtons"></div>');
         root.append(sideButtons);
+        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus"><img src="target.png"></img></button>');
+        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View"><img src="seeall.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen"><img src="fs.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot"><img src="camera.png"></img></button>');
-        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In"><img src="plus.png"></img></button>');
-        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out"><img src="minus.png"></img></button>');
         sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time"><img src="link.png"></img></button>');
         sideButtons.append(" <div class='URLinfo'>Link to the lecture at the current time: <br/><textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea></div>");
         
@@ -1504,7 +1508,7 @@ var Grapher = function() {
         
         console.log(localStorage);
         
-        if (localStorage[datafile]!==undefined){ //checking for localstorage data
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //checking for localstorage data
             var local=JSON.parse(localStorage[datafile]);
             currentI=local.currentTime;
             furthestpoint=local.furthestPoint;

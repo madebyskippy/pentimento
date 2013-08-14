@@ -17,6 +17,10 @@ body{
     background-color: #fff;
 }
 
+.lecture{
+    margin: auto auto;
+}
+
 /**stuff overlayed on top of everything**/
 
 .zoomRect {
@@ -245,7 +249,7 @@ input[type='button']:focus{
 }
 
 .transBtns{
-    position:absolute;
+    position:relative;
     background-color: rgba(255,255,255,0);
     border-width: 0;
     padding: 0;
@@ -260,4 +264,9 @@ input[type='button']:focus{
 }
 .transBtns:hover{
     opacity: 1;
+}
+
+.sideButtons{
+    position:absolute;
+    border:1px solid rgba(128,128,128,0.5);
 }

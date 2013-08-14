@@ -801,8 +801,8 @@ var Grapher = function() {
         $('#slider .ui-slider-handle').css('background','#0b0');
         root.find('.video').css('border','1px solid #eee');
         
-        $('#pauseIcon').attr("src",'play_big.png');
-        fadeSign('pause_big.png');
+        $('#pauseIcon').attr("src",'play.png');
+        fadeSign('pause.png');
         
         window.cancelAnimationFrame(draw);
         draw = window.requestAnimationFrame(graphData);
@@ -817,8 +817,8 @@ var Grapher = function() {
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
         
-        $('#pauseIcon').attr("src",'pause_big.png');
-        fadeSign('play_big.png');
+        $('#pauseIcon').attr("src",'pause.png');
+        fadeSign('play.png');
         
         window.cancelAnimationFrame(draw);
     }
@@ -872,7 +872,6 @@ var Grapher = function() {
         $('.buttons button').css('height',smallButtonWidths);
         $('.buttons button').css('background-size',smallButtonWidths-4);
         $('.buttons button').css('margin-top',smallButtonWidths/2-2);
-        $('.buttons button').css('border-radius',smallButtonWidths);
         $('.speedUp').css('margin-left',smallButtonWidths+4);
         
         //set volume button and slider
@@ -1095,30 +1094,19 @@ var Grapher = function() {
     }
     
     //controls displays of the speed buttons (fast forward and slow down)
-    //green when it's < or > than 1, none when it ==1, red when <0
+    //green when it's < or > than 1, none when it ==1
     //also displays total speed on the screen
     function speedIndicators(){
-        $('.speedDisplay').text(Math.round(audio.playbackRate/1*10)/10 +" x");
+        $('.speedDisplay').text(Math.round(audio.playbackRate/1*100)/100 +" x");
         if (audio.playbackRate>1){
-            $('.speedUp').css('border-color','#0e9300');
             $('.speedUp').css('opacity','.7');
-            $('.slowDown').css('border-color','');
             $('.slowDown').css('opacity','');
-        } else if (audio.playbackRate < 1 & audio.playbackRate > 0){
-            $('.slowDown').css('border-color','#0e9300');
+        } else if (audio.playbackRate < 1){
             $('.slowDown').css('opacity','.7');
-            $('.speedUp').css('border-color','');
-            $('.speedUp').css('opacity','');
-        } else if (audio.playbackRate < 0){
-            $('.slowDown').css('border-color','#f44');
-            $('.slowDown').css('opacity','.7');
-            $('.speedUp').css('border-color','');
             $('.speedUp').css('opacity','');
         } else {
             $('.speedDisplay').text("");
-            $('.slowDown').css('border-color','');
             $('.slowDown').css('opacity','');
-            $('.speedUp').css('border-color','');
             $('.speedUp').css('opacity','');
         }
     }
@@ -1449,13 +1437,23 @@ var Grapher = function() {
         
         //fast forward & slow down
         root.find('.speedUp').on('click', function() {
-            audio.playbackRate += 0.1;
-            audio.defaultPlaybackRate += 0.1;
+            if ( audio.playbackRate < 1 ){
+                audio.playbackRate += .25;
+                audio.defaultPlaybackRate += .25;
+            } else if (audio.playbackRate < 5){
+                audio.playbackRate += .5;
+                audio.defaultPlaybackRate += .5;
+            }
             speedIndicators();
         });
         root.find('.slowDown').on('click', function() {
-            audio.playbackRate -= 0.1;
-            audio.defaultPlaybackRate -= 0.1;
+            if (audio.playbackRate > 1){
+                audio.playbackRate -= .5;
+                audio.defaultPlaybackRate -= .5;
+            } else if ( audio.playbackRate > 0){
+                audio.playbackRate -= .25;
+                audio.defaultPlaybackRate -= .25;
+            }
             speedIndicators();
         });
         

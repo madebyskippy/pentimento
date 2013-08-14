@@ -631,8 +631,11 @@ var Grapher = function() {
         freePosition = initialFree;
         $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
                           'transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomIn').find('img').css('opacity',totalZoom===maxZoom?0.1:1);
         $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
                            'transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomOut').find('img').css('opacity',totalZoom===minZoom?0.1:1);
+        $('#seeAll').find('img').css('opacity',totalZoom===minZoom?0.1:1);
     }
     
     function pan(dx, dy) {
@@ -933,7 +936,8 @@ var Grapher = function() {
         
         if(fullscreenMode) {
             $('body').css('padding',0);
-            root.find('.menulink .pentimentoDialog').hide();
+            root.find('.menulink').hide();
+            root.find('.pentimentoDialog').hide();
             canvas.height = windowHeight;
             canvas.width = xmax/ymax*canvas.height;
             if(canvas.width > windowWidth) {
@@ -949,7 +953,8 @@ var Grapher = function() {
         }
         else {
             $('body').css('padding','');
-            root.find('.menulink .pentimentoDialog').show();
+            root.find('.menulink').show();
+            root.find('.pentimentoDialog').show();
             canvas.height=ymax * videoDim/scaleFactor;
             canvas.width=xmax * videoDim/scaleFactor;
             $('.lecture').css({height: 'auto',
@@ -988,7 +993,9 @@ var Grapher = function() {
         $('.sideButtons').css({top: (offset.top),
                                left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+canvas.width+10),
                                height: (transBtnDim*7),
-                               width:sideIncrement,'border-radius':transBtnDim});
+                               width:sideIncrement,
+                               'border-radius':transBtnDim,
+                               background:'rgba(235,235,235,'+(fullscreenMode?'0.1':'0.3')+')'});
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
                              margin:transBtnDim/2,
@@ -1126,7 +1133,7 @@ var Grapher = function() {
     
     function setFreePosition(free) {
         freePosition = free;
-        $('#revertPos').find('img').attr('src',free?'target.gif':'target.png');
+        $('#revertPos').find('img').css('opacity',free?1:0.1);
     }
     
     function animateZoom(nz) { // for zoom buttons
@@ -1299,7 +1306,7 @@ var Grapher = function() {
             down: function(e) {
                 if(e.target === canvas)
                     mouseDown(e);
-                if(e.target !== $('.URLinfo')[0])
+                if(e.target !== $('.URLinfo')[0] & e.target !== $('.URLs')[0])
                     $('.URLinfo').css('visibility','hidden');
             },
             move: mouseMove,
@@ -1349,15 +1356,14 @@ var Grapher = function() {
         //side controls
         var sideButtons=$('<div class="sideButtons"></div>');
         $('.lecture').append(sideButtons);
-        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In (+)"><img src="plus.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus (Enter)"><img src="target.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View (A)"><img src="seeall.png"></img></button>');
-        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out (-)"><img src="minus.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen (F)"><img src="fs.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot (S)"><img src="camera.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="link.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="zoomIn" title="Zoom In (+)"><img src="plus.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="revertPos" title="Refocus (Enter)"><img src="target.png" style="opacity:0.1;"></img></button>');
+        sideButtons.append('<button class="transBtns" id="seeAll" title="Big Board View (A)"><img src="seeall.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="zoomOut" title="Zoom Out (-)"><img src="minus.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="fullscreen" title="Fullscreen (F)"><img src="fs.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="screenshotURL" title="Screenshot (S)"><img src="camera.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="link.png"></img></button>');
         sideButtons.append(" <div class='URLinfo'>Link to the lecture at the current time: <br/><textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea></div>");
-        
         
         $('#revertPos').on('click', function () {
             setFreePosition(false);

@@ -172,7 +172,7 @@ input[type='button']:focus{
 }
 
 .help{
-    background-image: url('help.png');
+    background-image: url('images/help.png');
 }
 
 .volume{

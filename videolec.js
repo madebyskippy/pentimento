@@ -1477,8 +1477,6 @@ var Grapher = function() {
         $(document).on('keyup',function(event){
             var keyCode = event.keyCode || event.which;
             if (keyCode===27) { // esc was pressed
-                event.preventDefault();
-                event.stopPropagation();
                 setFullscreenMode(false);
             }
             if (keyCode===32){ // space was pressed
@@ -1525,7 +1523,11 @@ var Grapher = function() {
         }
         
         $(window).on('resize',resizeVisuals);
-        $(document).on('fullscreenchange webkitfullscreenchange mozfullscreenchange',resizeVisuals);
+        $(document).on('mozfullscreenchange', function() {
+            if(document.mozFullScreenElement === null)
+                setFullscreenMode(false);
+        });
+        $(document).on('fullscreenchange webkitfullscreenchange', resizeVisuals);
     }
     return exports;
 };

@@ -878,7 +878,7 @@ var Grapher = function() {
         $('.help').css('height',bigButtonWidths);
         $('.help').css('margin-top','3px');
         $('.help').css('background-size',bigButtonWidths);
-        $('.help').css('left',canvas.width-bigButtonWidths);
+        $('.help').css('left',vidWidth-bigButtonWidths);
         
         //set volume button and slider
         var volWidth= vidWidth * 30/575;
@@ -1102,6 +1102,7 @@ var Grapher = function() {
         else    document.cancelFullScreen();
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
         root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen (ESC)':'Fullscreen (F)');
+        root.find('.help').css('visibility',fullscreenMode?'hidden':'visible');
         resizeVisuals();
     }
     
@@ -1474,15 +1475,14 @@ var Grapher = function() {
         //keystrokes
         $(document).on('keyup',function(event){
             var keyCode = event.keyCode || event.which;
-            console.log(keyCode);
-            if (keyCode===32){ // space was pressed
-                //trigger button click
-                root.find('.start').click();
-            }
             if (keyCode===27) { // esc was pressed
                 event.preventDefault();
                 event.stopPropagation();
                 setFullscreenMode(false);
+            }
+            if (keyCode===32){ // space was pressed
+                //trigger button click
+                root.find('.start').click();
             }
             if(keyCode===68) //d was pressed
                 discoMode = !discoMode;
@@ -1500,6 +1500,7 @@ var Grapher = function() {
                 root.find('#screenshotURL').click();
             if(keyCode===76)
                 root.find('#timeStampURL').click();
+            console.log(keyCode);
         });
         $(document).on('keydown',function(event){ // for keys which can be pressed and held
             var keyCode = event.keyCode || event.which;
@@ -1523,6 +1524,7 @@ var Grapher = function() {
         }
         
         $(window).on('resize',resizeVisuals);
+        $(document).on('fullscreenchange webkitfullscreenchange mozfullscreenchange',resizeVisuals);
     }
     return exports;
 };

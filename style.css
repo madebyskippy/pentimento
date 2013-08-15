@@ -171,6 +171,10 @@ input[type='button']:focus{
     margin-left:30px;
 }
 
+.help{
+    background-image: url('help.png');
+}
+
 .volume{
     background-image: url('vol.png');
     width:30px;
@@ -271,6 +275,8 @@ input[type='button']:focus{
 .sideButtons{
     position:absolute;
 }
+
+/**ABOUT MODAL**/
 
 .ui-dialog{
     z-index: 9000;

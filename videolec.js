@@ -874,6 +874,11 @@ var Grapher = function() {
         $('.buttons button').css('background-size',smallButtonWidths-4);
         $('.buttons button').css('margin-top',smallButtonWidths/2-2);
         $('.speedUp').css('margin-left',smallButtonWidths+4);
+        $('.help').css('width',bigButtonWidths);
+        $('.help').css('height',bigButtonWidths);
+        $('.help').css('margin-top','3px');
+        $('.help').css('background-size',bigButtonWidths);
+        $('.help').css('left',canvas.width-bigButtonWidths);
         
         //set volume button and slider
         var volWidth= vidWidth * 30/575;
@@ -1138,8 +1143,7 @@ var Grapher = function() {
         animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
     }
     
-    var template="<a class='menulink' href='index.html'>back to menu</a>"
-        + "<a class='pentimentoDialog' href='#' style='position:relative;'>about</a><div class='lecture'>"
+    var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<br> <div class='captions'>test captions</div>"
@@ -1236,6 +1240,7 @@ var Grapher = function() {
         $('.buttons').append('<button class="slowDown"></button>');
         $('.buttons').append('<button class="speedUp"></button>');
         $('.controls').append('<div class="speedDisplay"></div>');
+        $('.buttons').append('<button class="help"></button>');
         
         $('#slider').slider({
             max:100,
@@ -1426,8 +1431,9 @@ var Grapher = function() {
                 }
             }
         });
+        $('.ui-dialog-titlebar').hide();
         $('#description-dialog').dialog('close');
-        $('.pentimentoDialog').on('click',function(){
+        $('.help').on('click',function(){
             $('#description-dialog').dialog('open');
         });
                 

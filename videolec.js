@@ -24,6 +24,7 @@ var Grapher = function() {
     var offset; //position of canvas
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     var fullscreenMode = false;
+    var embedded = false;
     var controlsVisible = true;
     var freePosition = false;
     var animating = false;
@@ -631,8 +632,11 @@ var Grapher = function() {
         freePosition = initialFree;
         $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
                           'transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomIn').find('img').css('opacity',totalZoom===maxZoom?0.1:1);
         $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
                            'transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomOut').find('img').css('opacity',totalZoom===minZoom?0.1:1);
+        $('#seeAll').find('img').css('opacity',totalZoom===minZoom?0.1:1);
     }
     
     function pan(dx, dy) {
@@ -932,25 +936,33 @@ var Grapher = function() {
             var scaleFactor=xmax; //using width to scale
         }
         
-        if(fullscreenMode) {
+        if(fullscreenMode | embedded) {
             $('body').css('padding',0);
-            root.find('.menulink .pentimentoDialog').hide();
-            canvas.height = windowHeight;
-            canvas.width = xmax/ymax*canvas.height;
-            if(canvas.width > windowWidth) {
-                canvas.width = windowWidth;
-                canvas.height = ymax/xmax*canvas.width;
+            root.find('.menulink').hide();
+            root.find('.pentimentoDialog').hide();
+            if(fullscreenMode) {
+                canvas.height = windowHeight;
+                canvas.width = xmax/ymax*canvas.height;
+                if(canvas.width > windowWidth) {
+                    canvas.width = windowWidth;
+                    canvas.height = ymax/xmax*canvas.width;
+                }
+            }
+            else {
+                canvas.height = windowHeight-controls.outerHeight(true);
+                canvas.width = xmax/ymax*canvas.height;
             }
             $('.lecture').css({height: canvas.height,
-                               width: canvas.width});
+                               width: canvas.width,margin: embedded?0:'auto auto'});
             controls.css({position: 'absolute',
                                 top: ((windowHeight-controls.outerHeight(true))+'px'),
                                 left: 0,
-                                'background-color':'rgba(245,245,245,0.9)'});
+                                'background-color':fullscreenMode?'rgba(245,245,245,0.9)':''});
         }
         else {
             $('body').css('padding','');
-            root.find('.menulink .pentimentoDialog').show();
+            root.find('.menulink').show();
+            root.find('.pentimentoDialog').show();
             canvas.height=ymax * videoDim/scaleFactor;
             canvas.width=xmax * videoDim/scaleFactor;
             $('.lecture').css({height: 'auto',
@@ -987,9 +999,11 @@ var Grapher = function() {
         var sideIncrement = fullscreenMode?canvas.height/7:canvas.height/6;
         var transBtnDim = sideIncrement/2;
         $('.sideButtons').css({top: (offset.top),
-                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+canvas.width+10),
+                               left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+canvas.width+(embedded?0:10)),
                                height: (transBtnDim*7),
-                               width:sideIncrement,'border-radius':transBtnDim});
+                               width:sideIncrement,
+                               'border-radius':transBtnDim,
+                               background:'rgba(235,235,235,'+(fullscreenMode?'0.1':'0.3')+')'});
         $('.transBtns').css({height:transBtnDim,
                              width:transBtnDim,
                              margin:transBtnDim/2,
@@ -1115,7 +1129,7 @@ var Grapher = function() {
     
     function setFreePosition(free) {
         freePosition = free;
-        $('#revertPos').find('img').attr('src',free?'images/target.gif':'images/target.png');
+        $('#revertPos').find('img').css('opacity',free?1:0.1);
     }
     
     function animateZoom(nz) { // for zoom buttons
@@ -1178,6 +1192,7 @@ var Grapher = function() {
         var filename=getURLParameter('n',location.search);
         var t=getURLParameter('t',location.search);
         var end=getURLParameter('end',location.search);
+        embedded = getURLParameter('embed',location.search)==1;
         console.log(filename,t,end);
         
         datafile="lectures/"+filename+".lec";
@@ -1288,7 +1303,7 @@ var Grapher = function() {
             down: function(e) {
                 if(e.target === canvas)
                     mouseDown(e);
-                if(e.target !== $('.URLinfo')[0])
+                if(e.target !== $('.URLinfo')[0] & e.target !== $('.URLs')[0])
                     $('.URLinfo').css('visibility','hidden');
             },
             move: mouseMove,
@@ -1338,15 +1353,14 @@ var Grapher = function() {
         //side controls
         var sideButtons=$('<div class="sideButtons"></div>');
         $('.lecture').append(sideButtons);
-        sideButtons.append('<button class="small transBtns" id="zoomIn" title="Zoom In (+)"><img src="images/plus.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="revertPos" title="Refocus (Enter)"><img src="images/target.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="seeAll" title="Big Board View (A)"><img src="images/seeall.png"></img></button>');
-        sideButtons.append('<button class="small transBtns" id="zoomOut" title="Zoom Out (-)"><img src="images/minus.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="fullscreen" title="Fullscreen (F)"><img src="images/fs.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="screenshotURL" title="Screenshot (S)"><img src="images/camera.png"></img></button>');
-        sideButtons.append('<button class="big transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="images/link.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="zoomIn" title="Zoom In (+)"><img src="images/plus.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="revertPos" title="Refocus (Enter)"><img src="images/target.png" style="opacity:0.1;"></img></button>');
+        sideButtons.append('<button class="transBtns" id="seeAll" title="Big Board View (A)"><img src="images/seeall.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="zoomOut" title="Zoom Out (-)"><img src="images/minus.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="fullscreen" title="Fullscreen (F)"><img src="images/fs.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="screenshotURL" title="Screenshot (S)"><img src="images/camera.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="images/link.png"></img></button>');
         sideButtons.append(" <div class='URLinfo'>Link to the lecture at the current time: <br/><textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea></div>");
-        
         
         $('#revertPos').on('click', function () {
             setFreePosition(false);
@@ -1485,6 +1499,7 @@ var Grapher = function() {
         $(document).on('keydown',function(event){ // for keys which can be pressed and held
             var keyCode = event.keyCode || event.which;
             if(keyCode>=37 & keyCode <= 40) { // an arrow key
+                setFreePosition(true);
                 var increment = event.shiftKey?20:5;
                 pan(keyCode%2*(38-keyCode)*increment, (keyCode+1)%2*(39-keyCode)*increment);
             }

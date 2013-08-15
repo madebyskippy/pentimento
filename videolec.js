@@ -1498,6 +1498,7 @@ var Grapher = function() {
         $(document).on('keydown',function(event){ // for keys which can be pressed and held
             var keyCode = event.keyCode || event.which;
             if(keyCode>=37 & keyCode <= 40) { // an arrow key
+                setFreePosition(true);
                 var increment = event.shiftKey?20:5;
                 pan(keyCode%2*(38-keyCode)*increment, (keyCode+1)%2*(39-keyCode)*increment);
             }

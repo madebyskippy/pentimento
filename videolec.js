@@ -42,7 +42,7 @@ var Grapher = function() {
     
     var furthestpoint=0; // furthest point in seconds
     
-    var endTime;	// maximum time value
+    var endTime;	// maximum time value ---NOT CURRENTLY IMPLEMENTED
     
     var currentTime=0; //current index of time (in seconds)
     var initialPause = true; //used in dragging 
@@ -349,6 +349,7 @@ var Grapher = function() {
         }
     }
     
+    //returns distance between two points, (x1,y1) and (x2,y2)
     function getDistance(x1,y1,x2,y2){
         return Math.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
     }
@@ -412,7 +413,6 @@ var Grapher = function() {
 	}
     
     //draw polygon for each stroke
-    //TODO: break stroke into portions
     function calligraphize(startIndex, path, reversed) {
         if(startIndex === 0)
             context.beginPath();
@@ -544,7 +544,7 @@ var Grapher = function() {
         var minutes=Math.floor(totalseconds/60);
         var seconds=Math.round(totalseconds - minutes * 60);
         var zeros='';
-        if (seconds < 10) zeros='0';
+        if (seconds < 10) zeros='0'; //adds zero for stuff like 01, 02 , etc
         return minutes +":"+zeros+seconds;
     }
     
@@ -798,12 +798,12 @@ var Grapher = function() {
     //starts lecture
     function start(){
         root.find('.start').css('background-image',
-            "url('pause.png')");
+            "url('images/pause.png')");
         $('#slider .ui-slider-handle').css('background','#0b0');
         root.find('.video').css('border','1px solid #eee');
         
-        $('#pauseIcon').attr("src",'play.png');
-        fadeSign('pause.png');
+        $('#pauseIcon').attr("src",'images/play.png');
+        fadeSign('images/pause.png');
         
         window.cancelAnimationFrame(draw);
         draw = window.requestAnimationFrame(graphData);
@@ -814,12 +814,12 @@ var Grapher = function() {
         $('#timeStampURL').attr("disabled",false);
         $('#screenshotURL').attr("disabled",false);
         root.find('.start').css('background-image',
-            "url('play.png')");
+            "url('images/play.png')");
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
         
-        $('#pauseIcon').attr("src",'pause.png');
-        fadeSign('play.png');
+        $('#pauseIcon').attr("src",'images/pause.png');
+        fadeSign('images/play.png');
         
         window.cancelAnimationFrame(draw);
     }
@@ -831,7 +831,7 @@ var Grapher = function() {
         localStorage.removeItem(datafile);
         
         root.find('.start').css('background-image',
-            "url('play.png')");
+            "url('images/play.png')");
         $('#slider .ui-slider-handle').css('background','#f55');
         root.find('.video').css('border','1px solid #f88');
         
@@ -920,6 +920,8 @@ var Grapher = function() {
         oneFrame(audio.currentTime);
     }
     
+    //resizes visuals upon window size changing
+    //acts different depending on if it's fullscreen or not
     function resizeVisuals(){
         var windowWidth=$(window).width();
         var windowHeight=$(window).height();
@@ -1100,14 +1102,13 @@ var Grapher = function() {
         fullscreenMode = on;
         if(on)  root[0].requestFullScreen();
         else    document.cancelFullScreen();
-        root.find('#fullscreen').find('img').attr('src', fullscreenMode?"exitfs.png":"fs.png");
+        root.find('#fullscreen').find('img').attr('src', fullscreenMode?"images/exitfs.png":"images/fs.png");
         root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen (ESC)':'Fullscreen (F)');
         root.find('.help').css('visibility',fullscreenMode?'hidden':'visible');
         resizeVisuals();
     }
     
     //controls displays of the speed buttons (fast forward and slow down)
-    //green when it's < or > than 1, none when it ==1
     //also displays total speed on the screen
     function speedIndicators(){
         $('.speedDisplay').text(Math.round(audio.playbackRate/1*100)/100 +" x");
@@ -1146,7 +1147,7 @@ var Grapher = function() {
     
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
-        + "<div class='onScreenStatus'> <img src='pause_big.png' id='pauseIcon' width='0px' height='0px'> </div>"
+        + "<div class='onScreenStatus'> <img src='images/pause.png' id='pauseIcon' width='0px' height='0px'> </div>"
         + "<br> <div class='captions'>test captions</div>"
         + "<div class='controls'>"
         + " <div id='slider'></div>"
@@ -1226,11 +1227,11 @@ var Grapher = function() {
             if (audio.muted){ //it was muted, unmute it
                 audio.muted=false;
                 $('.volumeSlider').slider('enable');
-                $('.volume').css('background-image','url("vol.png")');
+                $('.volume').css('background-image','url("images/vol.png")');
             }else { //it wasn't muted, mute it
                 audio.muted=true;
                 $('.volumeSlider').slider('disable');
-                $('.volume').css('background-image','url("mute.png")');
+                $('.volume').css('background-image','url("images/mute.png")');
             }
         });
         
@@ -1358,13 +1359,13 @@ var Grapher = function() {
         //side controls
         var sideButtons=$('<div class="sideButtons"></div>');
         $('.lecture').append(sideButtons);
-        sideButtons.append('<button class="transBtns" id="zoomIn" title="Zoom In (+)"><img src="plus.png"></img></button>');
-        sideButtons.append('<button class="transBtns" id="revertPos" title="Refocus (Enter)"><img src="target.png" style="opacity:0.1;"></img></button>');
-        sideButtons.append('<button class="transBtns" id="seeAll" title="Big Board View (A)"><img src="seeall.png"></img></button>');
-        sideButtons.append('<button class="transBtns" id="zoomOut" title="Zoom Out (-)"><img src="minus.png"></img></button>');
-        sideButtons.append('<button class="transBtns" id="fullscreen" title="Fullscreen (F)"><img src="fs.png"></img></button>');
-        sideButtons.append('<button class="transBtns" id="screenshotURL" title="Screenshot (S)"><img src="camera.png"></img></button>');
-        sideButtons.append('<button class="transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="link.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="zoomIn" title="Zoom In (+)"><img src="images/plus.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="revertPos" title="Refocus (Enter)"><img src="images/target.png" style="opacity:0.1;"></img></button>');
+        sideButtons.append('<button class="transBtns" id="seeAll" title="Big Board View (A)"><img src="images/seeall.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="zoomOut" title="Zoom Out (-)"><img src="images/minus.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="fullscreen" title="Fullscreen (F)"><img src="images/fs.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="screenshotURL" title="Screenshot (S)"><img src="images/camera.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="images/link.png"></img></button>');
         sideButtons.append(" <div class='URLinfo'>Link to the lecture at the current time: <br/><textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea></div>");
         
         $('#revertPos').on('click', function () {

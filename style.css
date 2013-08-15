@@ -129,7 +129,7 @@ input[type='button']:focus{
 }
 
 .start{
-    background-image: url('play.png');
+    background-image: url('images/play.png');
 }
 
 #totalTime{
@@ -159,13 +159,13 @@ input[type='button']:focus{
 }
 
 .slowDown{
-    background-image: url('slow.png');
+    background-image: url('images/slow.png');
     width:25px;
     margin:1px;
 }
 
 .speedUp{
-    background-image: url('ff.png');
+    background-image: url('images/ff.png');
     width:25px;
     margin:1px;
     margin-left:30px;
@@ -176,7 +176,7 @@ input[type='button']:focus{
 }
 
 .volume{
-    background-image: url('vol.png');
+    background-image: url('images/vol.png');
     width:30px;
     height:30px;
     background-size: 30px;

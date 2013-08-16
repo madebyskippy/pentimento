@@ -25,6 +25,7 @@ var Grapher = function() {
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
     var draggingVertScrollbar = false;
     var draggingHorizScrollbar = false;
+    var hoveringOverScrollbars = false;
     var fullscreenMode = false;
     var embedded = false;
     var controlsVisible = true;
@@ -338,7 +339,7 @@ var Grapher = function() {
         translateY = Math.min(Math.max(translateY,canvas.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
-        if((audio.paused | freePosition) & totalZoom !== minZoom & !isScreenshot) {
+        if((audio.paused | freePosition | hoveringOverScrollbars) & totalZoom !== minZoom & !isScreenshot) {
             drawScrollBars(translateX, translateY, totalZoom);
         }
         
@@ -719,8 +720,16 @@ var Grapher = function() {
                     zoomRect.css('background-color', 'rgba(255,0,0,0.1)');
             }
         }
-        
-        if(fullscreenMode) toggleControlsVisibility(y);
+        else {
+            if(fullscreenMode) toggleControlsVisibility(y);
+            
+            if(!audio.paused &
+               ((x > offset.left+canvas.width-25 & x < offset.left+canvas.width) |
+                (y > offset.top+canvas.height-25 & y < offset.top+canvas.height)))
+                hoveringOverScrollbars = true;
+            else
+                hoveringOverScrollbars = false;
+        }
     }
     
     //triggered when mouse released on canvas

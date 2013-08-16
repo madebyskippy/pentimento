@@ -48,21 +48,27 @@ var Grapher = function() {
     var endTime;	// maximum time value ---NOT CURRENTLY IMPLEMENTED
     
     var currentTime=0; //current index of time (in seconds)
-    var initialPause = true; //used in dragging 
-        //(dragging pauses but unpauses if it was just a click)
-    var draw;
+    var initialPause = true; //used in scrubbing
+    var draw; // id for requestAnimationFrame/cancelAnimationFrame
     
     var numStrokes=0;
     var dataArray; //the given lecture data
     
+    /*************************
+    *
+    *   Clean up and optimize data for playback
+    *
+    *************************/
     function preProcess(json) {
-        //get bounding box
         boundingRect.xmax = json.width;
         boundingRect.ymax = json.height;
+        
+        //for counting overall reduction
         var origVertices = 0;
         var finalVertices = 0;
+        
         for(k in json.visuals) {
-            
+            //translate colors to RGB values
             var properties = json.visuals[k].properties;
             for(p in properties) {
                 var property = properties[p];
@@ -71,9 +77,11 @@ var Grapher = function() {
                 property.green = Math.round(parseFloat(property.green)*255);
                 property.redFill = Math.round(parseFloat(property.redFill)*255);
                 property.blueFill = Math.round(parseFloat(property.blueFill)*255);
-                property.greenFill = Math.round(parseFloat(property.greenFill)*255);
+                property.greenFill = Math.round(
+                    parseFloat(property.greenFill)*255);
             }
             
+            //get bounding box, invert y-coordinates
             var stroke = json.visuals[k].vertices;
             for(j in stroke) {
                 var point = stroke[j];
@@ -83,9 +91,9 @@ var Grapher = function() {
                 if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
                 if(point.y > boundingRect.ymax) boundingRect.ymax = point.y;
             }
-            
             origVertices += stroke.length;
-            //simplify strokes
+            
+            //remove consecutive points closer than 2px
             var j=0;
             while(j<stroke.length-1 & stroke.length > 10) {
                 var point = stroke[j];
@@ -96,7 +104,8 @@ var Grapher = function() {
                 else
                     j++;
             }
-            //clean up beginning/end
+            
+            //amplify noisy low-pressure points at beginning and end
             var clean = false;
             var cleanIndex = 0;
             while(!clean & cleanIndex < stroke.length-1) {
@@ -117,7 +126,8 @@ var Grapher = function() {
                 else
                     clean = true;
             }
-            //straighten straight lines
+            
+            //straighten straight lines and clean up further
             var begin = stroke[0];
             var end = stroke[stroke.length-1];
             var sumDist = 0;
@@ -146,17 +156,22 @@ var Grapher = function() {
                         j++;
                 }
             }
+            
             finalVertices += stroke.length;
         }
         console.log(origVertices, finalVertices);
-        //divide into similar-direction polygons
+        
+        // divide stroke into similar-direction
+        // polygons for calligraphy
         for(var i=0; i<json.visuals.length; i++) {
             var visual = json.visuals[i],
                 stroke = visual.vertices;
-            //find all breaking points
-            var cosb;
-            var j=0;
             
+            // use law of cosines to find when
+            // a stroke breaks across 45degs
+            var cosb;
+            
+            var j=0;
             while(j<stroke.length-1) {
                 var point = stroke[j],
                     next = stroke[j+1];
@@ -175,7 +190,9 @@ var Grapher = function() {
                 j++;
             }
         }
-        //invert y transforms
+        
+        // invert y transforms, 
+        // set max/min zooms and bounding box based on transforms
         for(i in json.cameraTransforms) {
             var transform = json.cameraTransforms[i];
             transform.ty = -transform.ty;
@@ -189,15 +206,21 @@ var Grapher = function() {
         boundingRect.width = boundingRect.xmax - boundingRect.xmin;
         boundingRect.height = boundingRect.ymax - boundingRect.ymin;
         minZoom = Math.min(json.width/boundingRect.width,json.height/boundingRect.height);
+        numStrokes=json.visuals.length;
+        
+        // done loading, show player
         $('.lecture').show();
         $('.loadingMsg').remove();
         resizeVisuals();
-        numStrokes=json.visuals.length;
         
         return json;
     }
     
-    // fills dataArray with data from given .lec file, in JSON format
+    /*************************
+    *
+    *   fills and preprocesses dataArray with data from given .lec file, in JSON format
+    *
+    *************************/
     function getData(file) {
         dataArray = JSON.parse(file.responseText);
         endTime = dataArray.durationInSeconds;
@@ -207,7 +230,8 @@ var Grapher = function() {
         $('#totalTime').html("0:00 / "+secondsToTimestamp(endTime));
         dataArray = preProcess(dataArray);
         
-        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //if there is data in the localstorage
+        // set player according to localstorage
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
             var newTransform = getTransform(currentTime);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -227,7 +251,11 @@ var Grapher = function() {
 
     }
 
-    //access the .lec file and passes it to getData to process
+    /*************************
+    *
+    *   access the .lec file and pass it to getData to process
+    *
+    *************************/
 	function readFile(url, callback) {
 		var txtFile = new XMLHttpRequest();
 		txtFile.open("GET", url, true);	
@@ -240,10 +268,11 @@ var Grapher = function() {
 		txtFile.send(null);
 	}
     
-    
-    //called when you click on the canvas
-    //finds closest stroke to the click point and goes to the beginning of the stroke
-    //if no stroke is found within minDistance, nothing happens
+    /*************************
+    *   called when you click on the canvas
+    *   finds closest stroke to the click point and goes to the beginning of the stroke
+    *   if no stroke is found within minDistance, nothing happens
+    *************************/
     function selectStroke(x,y){
         x=x/xscale;
         y=y/yscale;
@@ -280,20 +309,25 @@ var Grapher = function() {
             audio.currentTime = time;
             changeSlider(time);
             
-            if(!freePosition) {
+            if(!freePosition) { // animate to playing position of selected stroke
                 var newTransform = getTransform(currentTime);
                 freePosition = true;
                 animateToPos(Date.now(), 500, translateX, translateY, totalZoom, newTransform.tx, newTransform.ty, newTransform.m11, function(){
                     freePosition = false;
                 });
             }
-            else if(audio.paused) { //if it was previously paused, remain paused
+            else if(audio.paused) { // draw the frame
                 clearFrame();
                 oneFrame(currentTime);
             }
         }
     }
     
+    /*************************
+    *
+    *   draw scrollbars on canvas with given transform
+    *
+    *************************/
     function drawScrollBars(tx, ty, z) {
         context.beginPath();
         context.strokeStyle = 'rgba(0,0,0,0.2)';
@@ -310,6 +344,11 @@ var Grapher = function() {
         context.stroke();
     }
     
+    /*************************
+    *
+    *   draw blue box indicating intended playing position
+    *
+    *************************/
     function drawBox(tx, ty, z) {
         context.beginPath();
         context.strokeStyle = 'rgba(0,0,255,0.1)';
@@ -325,8 +364,13 @@ var Grapher = function() {
         context.stroke();
     }
     
+    /*************************
+    *
+    *   clears canvas and draws scrollbars/box as appropriate
+    *
+    *************************/
     function clearFrame() {
-        // Use the identity matrix while clearing the canvas
+        // Reset transform for clearing
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, canvas.width, canvas.height);
         
@@ -339,6 +383,7 @@ var Grapher = function() {
         translateY = Math.min(Math.max(translateY,canvas.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
+        // Draw scrollbars when appropriate
         if((audio.paused | freePosition | hoveringOverScrollbars) & totalZoom !== minZoom & !isScreenshot) {
             drawScrollBars(translateX, translateY, totalZoom);
         }
@@ -347,7 +392,7 @@ var Grapher = function() {
         context.setTransform(totalZoom,0,0,totalZoom,
                              translateX,translateY);
         
-        //draw indicator box
+        // Draw indicator box when appropriate
         if(freePosition) {
             freePosition = false;
             var box = getTransform(audio.currentTime);
@@ -356,11 +401,20 @@ var Grapher = function() {
         }
     }
     
-    //returns distance between two points, (x1,y1) and (x2,y2)
+    /*************************
+    *
+    *   returns distance between two points
+    *
+    *************************/
     function getDistance(x1,y1,x2,y2){
         return Math.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
     }
     
+    /*************************
+    *
+    *   fetches the current camera transform from data
+    *
+    *************************/
     function getTransform(time) {
         if(!freePosition) {
             var newTransform = {};
@@ -393,8 +447,12 @@ var Grapher = function() {
             return {tx: translateX, ty: translateY, m11: totalZoom};
     }
     
-    //executes each frame of the lecture, including visual, slider & audio
-    //this is the method that gets called each timestep.
+    /*************************
+    *
+    *   playback function -
+    *   updates progress bar, canvas, and indicators
+    *
+    *************************/
     function graphData(){
 		currentTime=audio.currentTime;
 		changeSlider(currentTime);
@@ -407,7 +465,7 @@ var Grapher = function() {
         
         localStorage[datafile]=JSON.stringify(local);
         
-        if(!freePosition) {
+        if(!freePosition) { // follows camera transform if focused
             var newTransform = getTransform(currentTime);
             totalZoom = newTransform.m11;
             translateX = newTransform.tx;
@@ -419,7 +477,13 @@ var Grapher = function() {
         draw = window.requestAnimationFrame(graphData);
 	}
     
-    //draw polygon for each stroke
+    /*************************
+    *
+    *   Draws each stroke in calligraphic style,
+    *   breaking polygons and reversing draw order as needed to avoid overlap
+    *   each point = [x, y, pressure, (whetherToReverse)]
+    *
+    *************************/
     function calligraphize(startIndex, path, reversed) {
         if(startIndex === 0)
             context.beginPath();
@@ -428,7 +492,7 @@ var Grapher = function() {
         context.moveTo(point[0]+point[2],point[1]-point[2]);
         for(var i=startIndex+1; i<path.length-1; i++) {
             point = path[i];
-            if(point[3]) {
+            if(point[3]) { // 
                 endIndex = i+1;
                 i = path.length-2;
             }
@@ -454,8 +518,11 @@ var Grapher = function() {
         }
     }
     
-    //displays one frame
-    //only deals with visuals
+    /*************************
+    *
+    *   draws current frame on canvas
+    *
+    *************************/
     function oneFrame(current){
         
         var actualfurthest = furthestpoint;
@@ -471,7 +538,7 @@ var Grapher = function() {
                 var data = currentStroke.vertices;
              
                 var path = [];
-                var graypath = [];
+                var graypath = []; // in case half the stroke is grayed out
                 
                 //process the properties
                 var properties= currentStroke.properties;
@@ -545,8 +612,11 @@ var Grapher = function() {
         furthestpoint = actualfurthest;
     }
     
-    //turns total seconds into a timestamp of minute:seconds
-    //returns string
+    /*************************
+    *
+    *   translates seconds into minutes:seconds
+    *   returns string
+    *************************/
     function secondsToTimestamp(totalseconds){
         var minutes=Math.floor(totalseconds/60);
         var seconds=Math.round(totalseconds - minutes * 60);
@@ -555,8 +625,11 @@ var Grapher = function() {
         return minutes +":"+zeros+seconds;
     }
     
-    //changes where the handle is on the slider and the accompanying timestamp
-    //also changes the furthesttime bar
+    /*************************
+    *
+    *   updates progress slider as video plays
+    *   updates furthestpoint
+    *************************/
     function changeSlider(current){
         if (current<=endTime){ 
             $('#slider').slider('value',current);
@@ -574,8 +647,11 @@ var Grapher = function() {
         }
     }
     
-    //triggered on every mouse move of the slider
-    //sets currentTime, changes lecture to reflect new currentTime
+    /*************************
+    *
+    *   triggered on scrubbing
+    *   sets player to scrubbed time
+    *************************/
     function sliderTime(){
         var val=$('#slider').slider('value');
         currentTime=val;
@@ -590,34 +666,43 @@ var Grapher = function() {
         changeSlider(val);
     }
     
-    //triggered after a user stops sliding
-    //controls if lecture goes back to playing or not
+    /*************************
+    *
+    *   triggered when done scrubbing
+    *   returns to playing if was playing
+    *************************/
     function sliderStop(event, ui){
         audio.currentTime=ui.value;
         if (initialPause){ //if it was paused, don't do anything
             return;
         }
-        if (ui.value == endTime){
+        if (ui.value == endTime){ //if scrubbed to end
             stop();
             return;
         }
         audio.play();
     }
     
-    //triggered when user starts sliding
-    //pauses lecture while scrubbing
+    /*************************
+    *
+    *   triggered when starting to scrub
+    *   temporarily pauses lecture
+    *************************/
     function sliderStart(event, ui){
         initialPause=audio.paused;
         audio.pause();
     }
     
-    //triggered when user scrolls and zoom function is started
+    /*************************
+    *
+    *   triggered when user uses scrolling to zoom
+    *   currently over-modularized in case we want zoom slider back
+    *************************/
     function zoomStart() {
         previousX = translateX;
         previousY = translateY;
         previousZoom = totalZoom;
     }
-    
     function zooming(event, ui) {
         totalZoom = Math.max(minZoom, Math.min(ui.value, maxZoom));
         displayZoom(totalZoom);
@@ -632,6 +717,11 @@ var Grapher = function() {
     }
     
     
+    /*************************
+    *
+    *   sets side button indicators according to zoom
+    *
+    *************************/
     function displayZoom(newZoom){
         var initialFree = freePosition;
         freePosition = false;
@@ -646,6 +736,11 @@ var Grapher = function() {
         $('#seeAll').find('img').css('opacity',newZoom===minZoom?0.1:1);
     }
     
+    /*************************
+    *
+    *   translates canvas by dx, dy
+    *
+    *************************/
     function pan(dx, dy) {
         translateX += dx;
         translateY += dy;
@@ -655,16 +750,22 @@ var Grapher = function() {
         }
     }
     
-    //triggered when mouse pressed on canvas
+    /*************************
+    *
+    *   mouse pressed
+    *
+    *************************/
     function mouseDown(e) {
         mousePressed = true;
         previousX = e.pageX;
         previousY = e.pageY;
+        
         draggingHorizScrollbar = false, draggingVertScrollbar = false;
         if(previousX > offset.left+canvas.width-25)
             draggingVertScrollbar = true;
         else if(previousY > offset.top+canvas.height-25)
             draggingHorizScrollbar = true;
+        
         mouseDragged = false;
         startedToPan = dragToPan;
         if(!dragToPan) { // initialize zoom rectangle
@@ -674,7 +775,12 @@ var Grapher = function() {
         if(fullscreenMode) toggleControlsVisibility(previousY);
     }
     
-    //triggered when mouse dragged across canvas
+    
+    /*************************
+    *
+    *   mouse moved
+    *
+    *************************/
     function mouseMove(e) {
         var x = e.pageX,
             y = e.pageY;
@@ -720,23 +826,27 @@ var Grapher = function() {
                     zoomRect.css('background-color', 'rgba(255,0,0,0.1)');
             }
         }
-        else {
+        else { // non-dragging mouse move
             if(fullscreenMode) toggleControlsVisibility(y);
             
             if(!audio.paused &
-               ((x > offset.left+canvas.width-25 & x < offset.left+canvas.width) |
-                (y > offset.top+canvas.height-25 & y < offset.top+canvas.height)))
+               ((x > offset.left+canvas.width-25 & x < offset.left+canvas.width & y > offset.top & y < offset.top+canvas.height) |
+                (y > offset.top+canvas.height-25 & y < offset.top+canvas.height & x > offset.left & x < offset.left+canvas.width)))
                 hoveringOverScrollbars = true;
             else
                 hoveringOverScrollbars = false;
         }
     }
     
-    //triggered when mouse released on canvas
+    /*************************
+    *
+    *   mouse released
+    *
+    *************************/
     function mouseUp() {
         mousePressed = false;
         
-        if(!startedToPan & mouseDragged) { //zoom in on region
+        if(!startedToPan & mouseDragged) { // if zoom region selected
             var nz = canvas.width/Math.abs(zoomRectW/totalZoom);
             if(nz < maxZoom) {
                 var nx = -(zoomRect.position().left - offset.left - translateX)/totalZoom*nz;
@@ -752,22 +862,30 @@ var Grapher = function() {
             zoomRect.css({visibility: 'hidden', height: 0, width: 0});
         }
         
-        if(!mouseDragged) { // clicked
+        if(!mouseDragged) { // if clicked
             previousX=Math.round((previousX-offset.left-translateX)/totalZoom);
             previousY=Math.round((previousY-offset.top-translateY)/totalZoom);
             selectStroke(previousX,previousY);
         }
     }
     
-    // show/hide controls depending on mouse position
+    /*************************
+    *
+    *   show/hide playback controls depending on mouse position
+    *
+    *************************/
     function toggleControlsVisibility(y) {
-        if(!controlsVisible & y > $(window).height()-15)
+        if(!controlsVisible & y > $(window).height()-5)
             animateControls(true);
         if(controlsVisible & y < $(window).height()-controls.outerHeight(true)-20)
             animateControls(false);
     }
     
-    //for fullscreen, animates when the bottom controls come up and down
+    /*************************
+    *   in fullscreen mode,
+    *   animate playback controls in/out of bottom
+    *
+    *************************/
     function animateControls(show) {
         if(show) {
             controls.animate({top: (canvas.height-controls.outerHeight(true))},200);
@@ -779,7 +897,13 @@ var Grapher = function() {
         }
     }
     
-    //animates to a new transform
+    /*************************
+    *
+    *   animate canvas from transform{tx,ty,tz} to transform{nx,ny,nz}
+    *   (x,y = translation, z = zoom)
+    *   callback = a function
+    *   bounded = whether transform is within bounds
+    *************************/
     function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback, bounded) {
         clearTimeout(animateID);
         animating = true;
@@ -819,7 +943,11 @@ var Grapher = function() {
         }
     }
     
-    //starts lecture
+    /*************************
+    *
+    *   begins visual playback
+    *
+    *************************/
     function start(){
         root.find('.start').css('background-image',
             "url('images/pause.png')");
@@ -833,7 +961,11 @@ var Grapher = function() {
         draw = window.requestAnimationFrame(graphData);
     }
     
-    //pauses lecture at current timestamp
+    /*************************
+    *
+    *   pauses visual playback
+    *
+    *************************/
     function pause(){
         $('#timeStampURL').attr("disabled",false);
         $('#screenshotURL').attr("disabled",false);
@@ -846,9 +978,16 @@ var Grapher = function() {
         fadeSign('images/play.png');
         
         window.cancelAnimationFrame(draw);
+        
+        clearFrame();
+        oneFrame(audio.currentTime);
     }
     
-    //stop lecture, clears furthestpoint back to beginning
+    /*************************
+    *
+    *   stops visual playback, resets furthestpoint and localstorage
+    *
+    *************************/
     function stop(){
         window.cancelAnimationFrame(draw);
         
@@ -862,7 +1001,11 @@ var Grapher = function() {
         furthestpoint=0;
     }
     
-    //animation for the pause/play image that shows up in the middle of the lecture
+    /*************************
+    *
+    *   animates onscreen play/pause indicator
+    *
+    *************************/
     function fadeSign(nextImg){
         $('.onScreenStatus').stop();
         $('.onScreenStatus').css('visibility',"visible");
@@ -876,7 +1019,11 @@ var Grapher = function() {
         });
     }
     
-    //resizes controls upon window size changing
+    /*************************
+    *
+    *   resizes playback controls
+    *
+    *************************/
     function resizeControls(vidWidth){
         if(fullscreenMode)
             vidWidth = $(window).width();
@@ -944,8 +1091,11 @@ var Grapher = function() {
         oneFrame(audio.currentTime);
     }
     
-    //resizes visuals upon window size changing
-    //acts different depending on if it's fullscreen or not
+    /*************************
+    *
+    *   resizes player components depending on mode
+    *
+    *************************/
     function resizeVisuals(){
         var windowWidth=$(window).width();
         var windowHeight=$(window).height();
@@ -965,7 +1115,7 @@ var Grapher = function() {
             var scaleFactor=xmax; //using width to scale
         }
         
-        if(fullscreenMode | embedded) {
+        if(fullscreenMode | embedded) { // take up all available space
             $('body').css('padding',0);
             root.find('.menulink').hide();
             root.find('.pentimentoDialog').hide();
@@ -1043,7 +1193,11 @@ var Grapher = function() {
                            'border-right-width': transBtnDim+20,height:sideIncrement});
     }
     
-    //custom handler to distinguish between single- and double-click mouse and touch events
+    /*************************
+    *   custom mouse event handler
+    *   distinguishes between and mutually excludes touch/mouse events
+    *   distinguishes between and mutually excludes single/double-click events
+    *************************/
     function doubleClickHandler(input) {
         var element = input.element;
         var down = input.down;
@@ -1122,6 +1276,11 @@ var Grapher = function() {
         on();
     }
     
+    /*************************
+    *
+    *   toggle fullscreen mode
+    *
+    *************************/
     function setFullscreenMode(on) {
         fullscreenMode = on;
         if(on)  root[0].requestFullScreen();
@@ -1132,8 +1291,11 @@ var Grapher = function() {
         resizeVisuals();
     }
     
-    //controls displays of the speed buttons (fast forward and slow down)
-    //also displays total speed on the screen
+    /*************************
+    *
+    *   styles playback speed indicators
+    *
+    *************************/
     function speedIndicators(){
         $('.speedDisplay').text(Math.round(audio.playbackRate/1*100)/100 +" x");
         if (audio.playbackRate>1){
@@ -1149,26 +1311,44 @@ var Grapher = function() {
         }
     }
     
-    //returns the variable value for the variable 'name' from the given url 'data'
-    //if nothing's there, returns -100
+    /*************************
+    *
+    *   gets parameter [name] from url [data]
+    *   or -100 if does not exist
+    *************************/
     function getURLParameter(name,data) {
         return decodeURI(
             (RegExp('[?|&]'+name + '=' + '(.+?)(&|$)').exec(data)||[,-100])[1]
         );
     }
     
+    /*************************
+    *
+    *   toggle focused lecture/free board exploration
+    *
+    *************************/
     function setFreePosition(free) {
         freePosition = free;
         $('#revertPos').find('img').css('opacity',free?1:0.1);
     }
     
-    function animateZoom(nz) { // for zoom buttons
+    /*************************
+    *
+    *   animated zoom when using side buttons
+    *
+    *************************/
+    function animateZoom(nz) {
         var nx = translateX + (1-nz/totalZoom)*(canvas.width/2-translateX);
         var ny = translateY + (1-nz/totalZoom)*(canvas.height/2-translateY);
         setFreePosition(true);
         animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
     }
     
+    /*************************
+    *
+    *   HTML template
+    *
+    *************************/
     var template="<a class='menulink' href='index.html'>back to menu</a><div class='lecture'>"
         + "<canvas class='video'></canvas>"
         + "<div class='onScreenStatus'> <img src='images/pause.png' id='pauseIcon' width='0px' height='0px'> </div>"
@@ -1179,9 +1359,6 @@ var Grapher = function() {
         + "     <input class='start' type='button'/>"
         + " </div>"
         + " <div id='totalTime'></div>"
-        + " <div class='toggleControls'>Drag & Scroll Action:"
-        + "     <br/><span id='zoom'>Zoom</span><div id='toggleDrag'></div><span id='pan'>Pan</span>"
-        + "     <br/><span id='shiftinstructions'>Hold SHIFT to toggle</span></div>"
         + " <button class='volume'></button>"
         + " <div class='volumeSlider'></div>"
         + "<audio class='audio' preload='auto'>"
@@ -1200,9 +1377,16 @@ var Grapher = function() {
         + "</ul></div>"
         + "</div>"
     ;
+    
+    /*************************
+    *
+    *   called on load
+    *
+    *************************/
     exports.initialize = function() {
         $(window).off('doubleclick');
         
+        // define global variables
         root=$('.pentimento');
         root.append(template);
         zoomRect = root.find('.zoomRect');
@@ -1213,11 +1397,13 @@ var Grapher = function() {
         context=canvas.getContext('2d');
         $('.toggleControls').hide();
         
+        // generalizes vendor-prefixed functions
         window.requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame;
         window.cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame;
         document.cancelFullScreen = document.cancelFullScreen || document.webkitCancelFullScreen || document.mozCancelFullScreen;
         root[0].requestFullScreen = root[0].requestFullScreen || root[0].webkitRequestFullScreen || root[0].mozRequestFullScreen;
         
+        // fetch data from URL
         var filename=getURLParameter('n',location.search);
         var t=getURLParameter('t',location.search);
         var end=getURLParameter('end',location.search);
@@ -1228,7 +1414,7 @@ var Grapher = function() {
         audioSource="lectures/"+filename+".mp3";
         
         
-        //audio stuff, including volume
+        // set up audio
         
         audio=root.find('.audio')[0];
         var source=root.find('#lectureAudio');
@@ -1259,10 +1445,16 @@ var Grapher = function() {
             }
         });
         
-        //ACTUALLY GETS THE DATA
+        
+        /*************************
+        *
+        *   FETCH AND PROCESS DATA
+        *
+        *************************/
         readFile(datafile,getData);
         
-        //controls
+        // playback controls
+        
         $('.buttons').append('<button class="slowDown"></button>');
         $('.buttons').append('<button class="speedUp"></button>');
         $('.controls').append('<div class="speedDisplay"></div>');
@@ -1290,97 +1482,11 @@ var Grapher = function() {
                     //only call if it was a user-induced change, not program-induced
         });
         
-        //toggle between panning and zooming actions
-        root.find('#toggleDrag').slider({
-            min: -1, 
-            max: 1, 
-            step: 2, 
-            value: 1,
-            change: function(e, ui) {
-                dragToPan = ui.value > 0;
-                $('.toggleControls #pan').css('color',dragToPan?'#000':'#aaa');
-                $('.toggleControls #zoom').css('color',dragToPan?'#aaa':'#000');
-            }
-        });
-        
         $('#slider').append('<div class="tick ui-widget-content"></div>');
         $('#slider').find('.ui-slider-range').removeClass('ui-corner-all');
         
-        root.find('.toggleControls').on('click', function() {
-            root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value')});
-        });
-        
-        //WINDOW LISTENERS        
-        //shift to toggle
-        var shiftKeyPressed = false;
-        window.addEventListener('keydown', function(e) {
-            var key = e.keyCode || e.which;
-            if(key === 16 & !shiftKeyPressed) {
-                root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value'), disabled: true});
-                shiftKeyPressed = true;
-            }
-        });
-        window.addEventListener('keyup', function(e) {
-            var key = e.keyCode || e.which;
-            if(key === 16) {
-                root.find('#toggleDrag').slider({value: -root.find('#toggleDrag').slider('value'), disabled: false});
-                shiftKeyPressed = false;
-            }
-        });
-        
-        doubleClickHandler({
-            element: $(window),
-            down: function(e) {
-                if(e.target === canvas)
-                    mouseDown(e);
-                if(e.target !== $('.URLinfo')[0] & e.target !== $('.URLs')[0])
-                    $('.URLinfo').css('visibility','hidden');
-            },
-            move: mouseMove,
-            up: mouseUp,
-            double: function(e, target) {
-                if(target === canvas) {
-                    setFreePosition(true);
-                    
-                    var x = e.pageX,
-                        y = e.pageY;
-                    mousePressed = false;
-                    var nz = totalZoom===1?2:1;
-                    if(nz === 2) {
-                        previousX = x-canvas.width/2/nz;
-                        previousY = y-canvas.height/2/nz;
-                    }
-                    else {
-                        previousX = x>canvas.width/2?-canvas.width:0;
-                        previousY = y>canvas.height/2?-canvas.height:0;
-                    }
-                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
-                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
-                    
-                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
-                }
-            },
-            tolerance: 200
-        });
-        
-        canvas.addEventListener('mousewheel', function(e){
-            e.preventDefault();
-            e.stopPropagation();
-            setFreePosition(true);
-            if(!dragToPan) {
-                var scroll = e.wheelDeltaY;
-                if(e.shiftKey)
-                    scroll = e.wheelDeltaX;
-                if(scroll !== 0) {
-                    zoomStart();
-                    zooming('trash', {value: totalZoom+0.1*scroll/Math.abs(scroll)});
-                }
-            }
-            else
-                pan(e.wheelDeltaX, e.wheelDeltaY);
-        });
-        
         //side controls
+        
         var sideButtons=$('<div class="sideButtons"></div>');
         $('.lecture').append(sideButtons);
         sideButtons.append('<button class="transBtns" id="zoomIn" title="Zoom In (+)"><img src="images/plus.png"></img></button>');
@@ -1443,13 +1549,9 @@ var Grapher = function() {
             else $('.captions').css('visibility','hidden');
         });
         
-        //GENERAL CONTROL LISTENERS
-        
-        audio.addEventListener('play', start);
-        audio.addEventListener('pause', pause);
-        audio.addEventListener('ended', stop);
-        
+        // about modal dialog
         $('#description-dialog').dialog({
+            autoOpen: false,
             modal: true,
             buttons: {
                 OK: function() {
@@ -1458,11 +1560,89 @@ var Grapher = function() {
             }
         });
         $('.ui-dialog-titlebar').hide();
-        $('#description-dialog').dialog('close');
         $('.help').on('click',function(){
             $('#description-dialog').dialog('open');
         });
-                
+        
+        
+        /*************************
+        *
+        *   GENERAL EVENT LISTENERS
+        *
+        *************************/
+        
+        // shift to toggle drag/scroll to pan/zoom
+        var shiftKeyPressed = false;
+        window.addEventListener('keydown', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16 & !shiftKeyPressed) {
+                dragToPan = false;
+                shiftKeyPressed = true;
+            }
+        });
+        window.addEventListener('keyup', function(e) {
+            var key = e.keyCode || e.which;
+            if(key === 16) {
+                dragToPan = true;
+                shiftKeyPressed = false;
+            }
+        });
+        
+        // mouse actions, double click to zoom in
+        doubleClickHandler({
+            element: $(window),
+            down: function(e) {
+                if(e.target === canvas)
+                    mouseDown(e);
+                if(e.target !== $('.URLinfo')[0] & e.target !== $('.URLs')[0])
+                    $('.URLinfo').css('visibility','hidden');
+            },
+            move: mouseMove,
+            up: mouseUp,
+            double: function(e, target) {
+                if(target === canvas) {
+                    setFreePosition(true);
+                    
+                    var x = e.pageX,
+                        y = e.pageY;
+                    mousePressed = false;
+                    var nz = totalZoom===1?2:1;
+                    if(nz === 2) {
+                        previousX = x-canvas.width/2/nz;
+                        previousY = y-canvas.height/2/nz;
+                    }
+                    else {
+                        previousX = x>canvas.width/2?-canvas.width:0;
+                        previousY = y>canvas.height/2?-canvas.height:0;
+                    }
+                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
+                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
+                    
+                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
+                }
+            },
+            tolerance: 200
+        });
+        
+        // scrolling action - pan or shift-to-zoom
+        canvas.addEventListener('mousewheel', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            setFreePosition(true);
+            if(!dragToPan) {
+                var scroll = e.wheelDeltaY;
+                if(e.shiftKey)
+                    scroll = e.wheelDeltaX;
+                if(scroll !== 0) {
+                    zoomStart();
+                    zooming('trash', {value: totalZoom+0.1*scroll/Math.abs(scroll)});
+                }
+            }
+            else
+                pan(e.wheelDeltaX, e.wheelDeltaY);
+        });
+           
+        // play/pause button controls audio playback
         root.find('.start').on('click',function() {
             if(audio.paused) {
                 var next = getTransform(audio.currentTime);
@@ -1474,6 +1654,11 @@ var Grapher = function() {
                 audio.pause();
             }
         });
+        
+        // audio playback controls visual playback
+        audio.addEventListener('play', start);
+        audio.addEventListener('pause', pause);
+        audio.addEventListener('ended', stop);
         
         //fast forward & slow down
         root.find('.speedUp').on('click', function() {
@@ -1500,55 +1685,51 @@ var Grapher = function() {
         //keystrokes
         $(document).on('keyup',function(event){
             var keyCode = event.keyCode || event.which;
-            if (keyCode===27) { // esc was pressed
+            if (keyCode===27) // esc
                 setFullscreenMode(false);
-            }
-            if (keyCode===32){ // space was pressed
-                //trigger button click
+            if (keyCode===32) // space
                 root.find('.start').click();
-            }
-            if(keyCode===68) //d was pressed
+            if(keyCode===68) // d
                 discoMode = !discoMode;
-            if(keyCode===13)
+            if(keyCode===13) // enter
                 root.find('#revertPos').click();
-            if(keyCode===187)
+            if(keyCode===187) // +
                 root.find('#zoomIn').click();
-            if(keyCode===189)
+            if(keyCode===189) // -
                 root.find('#zoomOut').click();
-            if(keyCode===65)
+            if(keyCode===65) // a
                 root.find('#seeAll').click();
-            if(keyCode===70)
+            if(keyCode===70) // f
                 root.find('#fullscreen').click();
-            if(keyCode===83)
+            if(keyCode===83) // s
                 root.find('#screenshotURL').click();
-            if(keyCode===76)
+            if(keyCode===76) // l
                 root.find('#timeStampURL').click();
             console.log(keyCode);
         });
         $(document).on('keydown',function(event){ // for keys which can be pressed and held
             var keyCode = event.keyCode || event.which;
-            if(keyCode>=37 & keyCode <= 40) { // an arrow key
+            if(keyCode>=37 & keyCode <= 40) { // an arrow key, pan around
                 setFreePosition(true);
                 var increment = event.shiftKey?20:5;
                 pan(keyCode%2*(38-keyCode)*increment, (keyCode+1)%2*(39-keyCode)*increment);
             }
         });
         
-        console.log(localStorage);
-        
-        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){ //checking for localstorage data
+        // set data from localstorage
+        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
             var local=JSON.parse(localStorage[datafile]);
             currentTime=local.currentTime;
             furthestpoint=local.furthestPoint;
         }
-        
-        if (t != -100) { //check if URL came with timestamp
+        // then check data from URL
+        if (t != -100) {
             currentTime=t;
         }
         
         $(window).on('resize',resizeVisuals);
         
-        //to deal with fullscreen exit behavior differences
+        //to deal with fullscreen exit behavior differences between browsers
         $(document).on('mozfullscreenchange', function() {
             if(document.mozFullScreenElement === null)
                 setFullscreenMode(false);
@@ -1558,8 +1739,11 @@ var Grapher = function() {
     return exports;
 };
 
-
-//implements everything
+/*********************************
+*
+*   the function that starts it all
+*
+**********************************/
 (function() {
     var createGrapher = function() {
         window.grapher = Grapher(jQuery);

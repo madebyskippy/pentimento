@@ -23,6 +23,8 @@ var Grapher = function() {
     var zoomRectW = 0, zoomRectH = 0; //zoom region dimensions
     var offset; //position of canvas
     var scrollBarWidth, scrollBarLeft, scrollBarHeight, scrollBarTop;
+    var draggingVertScrollbar = false;
+    var draggingHorizScrollbar = false;
     var fullscreenMode = false;
     var embedded = false;
     var controlsVisible = true;
@@ -30,7 +32,7 @@ var Grapher = function() {
     var animating = false;
     var animateID;
     var discoMode = false;
-    var minDistance=10; //if the point is further than this then ignore it
+    var minDistance=15; //if the point is further than this then ignore it
     
     //LIMITS ON THINGS
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
@@ -245,6 +247,9 @@ var Grapher = function() {
         x=x/xscale;
         y=y/yscale;
         var closestPoint={stroke:-1,point:-1,distance:minDistance*xscale,time:0};
+        var actualfurthest = furthestpoint;
+        if(audio.currentTime > furthestpoint)
+            furthestpoint = audio.currentTime;
         for(var i=0; i<numStrokes; i++){ //run though all strokes
             var currentStroke=dataArray.visuals[i];
             for(var j=0;j<currentStroke.vertices.length; j++){ //run through all verticies
@@ -265,6 +270,7 @@ var Grapher = function() {
                 }
             }
         }
+        furthestpoint = actualfurthest;
         
         if (closestPoint.stroke!= -1){ //it found a close enough point
             //update current timestep
@@ -625,18 +631,18 @@ var Grapher = function() {
     }
     
     
-    function displayZoom(totalZoom){
+    function displayZoom(newZoom){
         var initialFree = freePosition;
         freePosition = false;
         var zoom = getTransform(audio.currentTime).m11;
         freePosition = initialFree;
-        $('#zoomIn').css({'-webkit-transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
-                          'transform':totalZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
-        $('#zoomIn').find('img').css('opacity',totalZoom===maxZoom?0.1:1);
-        $('#zoomOut').css({'-webkit-transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
-                           'transform':totalZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
-        $('#zoomOut').find('img').css('opacity',totalZoom===minZoom?0.1:1);
-        $('#seeAll').find('img').css('opacity',totalZoom===minZoom?0.1:1);
+        $('#zoomIn').css({'-webkit-transform':newZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
+                          'transform':newZoom>zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomIn').find('img').css('opacity',newZoom===maxZoom?0.1:1);
+        $('#zoomOut').css({'-webkit-transform':newZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)',
+                           'transform':newZoom<zoom?'scale(2) rotate(180deg)':'scale(1) rotate(0deg)'});
+        $('#zoomOut').find('img').css('opacity',newZoom===minZoom?0.1:1);
+        $('#seeAll').find('img').css('opacity',newZoom===minZoom?0.1:1);
     }
     
     function pan(dx, dy) {
@@ -653,6 +659,11 @@ var Grapher = function() {
         mousePressed = true;
         previousX = e.pageX;
         previousY = e.pageY;
+        draggingHorizScrollbar = false, draggingVertScrollbar = false;
+        if(previousX > offset.left+canvas.width-25)
+            draggingVertScrollbar = true;
+        else if(previousY > offset.top+canvas.height-25)
+            draggingHorizScrollbar = true;
         mouseDragged = false;
         startedToPan = dragToPan;
         if(!dragToPan) { // initialize zoom rectangle
@@ -673,7 +684,12 @@ var Grapher = function() {
             if(startedToPan) { // in panning mode
                 var newTx = (x-previousX);
                 var newTy = (y-previousY);
-                pan(newTx, newTy);
+                if(draggingVertScrollbar)
+                    pan(0, -newTy*boundingRect.height/ymax*totalZoom);
+                else if(draggingHorizScrollbar)
+                    pan(-newTx*boundingRect.width/xmax*totalZoom, 0);
+                else
+                    pan(newTx, newTy);
                 previousX = x;
                 previousY = y;
             }
@@ -758,6 +774,7 @@ var Grapher = function() {
     function animateToPos(startTime, duration, tx, ty, tz, nx, ny, nz, callback, bounded) {
         clearTimeout(animateID);
         animating = true;
+        displayZoom(nz);
         
         if(bounded===undefined) {
             nz = Math.min(Math.max(nz,minZoom),maxZoom);
@@ -770,7 +787,6 @@ var Grapher = function() {
         if(Date.now()-startTime > duration | (tx === nx & ty === ny & tz === nz)) {
             animating = false;
             translateX = nx, translateY = ny, totalZoom = nz;
-            displayZoom(totalZoom);
             if(callback !== undefined)
                 callback();
             if(audio.paused) {
@@ -784,7 +800,6 @@ var Grapher = function() {
             translateY = ty + (ny - ty)*interpolatedTime;
             
             if(audio.paused) {
-                displayZoom(totalZoom);
                 clearFrame();
                 oneFrame(audio.currentTime);
             }
@@ -1167,7 +1182,7 @@ var Grapher = function() {
         + "</div>"
         + "<div class='zoomRect'></div>"
         + "<div id='description-dialog'>"
-        + "     <h3>Pentimento Player</h3>"
+        + "     <h3><img src='images/penti.png'></img> Pentimento Player</h3>"
         + "     <ul><li>Click on a stroke to go to that point in the video</li>"
         + "     <li>Drag, scroll, or use arrow keys to pan around</li>"
         + "     <li>Shift-Scroll to zoom</li>"
@@ -1523,6 +1538,8 @@ var Grapher = function() {
         }
         
         $(window).on('resize',resizeVisuals);
+        
+        //to deal with fullscreen exit behavior differences
         $(document).on('mozfullscreenchange', function() {
             if(document.mozFullScreenElement === null)
                 setFullscreenMode(false);

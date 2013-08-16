@@ -281,3 +281,10 @@ input[type='button']:focus{
 .ui-dialog{
     z-index: 9000;
 }
+
+#description-dialog img{
+    height:40px;
+    width:40px;
+    position:relative;
+    top:10px;
+}

@@ -39,13 +39,13 @@ var Grapher = function() {
     var boundingRect = {xmin: 0, xmax: 0, ymin: 0, ymax: 0, width: 0, height: 0};
     var maxZoom = 4, minZoom = 1;
     
-    var audio;
+    var audio, datafile, audioSource;
     
     var isScreenshot=false; //true when you're getting a screenshot and don't want scroll bars
     
     var furthestpoint=0; // furthest point in seconds
     
-    var endTime;	// maximum time value ---NOT CURRENTLY IMPLEMENTED
+    var endTime;	// maximum time value
     
     var currentTime=0; //current index of time (in seconds)
     var initialPause = true; //used in scrubbing
@@ -239,6 +239,8 @@ var Grapher = function() {
             displayZoom(totalZoom);
             clearFrame();
             changeSlider(currentTime);
+            var percentage = (furthestpoint)/endTime * 100;
+            $('.tick').css('width',percentage+'%');
             oneFrame(currentTime);
             if(audio.readyState === 4)
                 audio.currentTime=currentTime;
@@ -456,14 +458,6 @@ var Grapher = function() {
     function graphData(){
 		currentTime=audio.currentTime;
 		changeSlider(currentTime);
-        if (currentTime > furthestpoint){
-            furthestpoint=currentTime;
-        }
-        
-        var local = { 'currentTime': parseFloat(currentTime), 
-                     'furthestPoint': parseFloat(furthestpoint)};
-        
-        localStorage[datafile]=JSON.stringify(local);
         
         if(!freePosition) { // follows camera transform if focused
             var newTransform = getTransform(currentTime);
@@ -632,18 +626,26 @@ var Grapher = function() {
     *************************/
     function changeSlider(current){
         if (current<=endTime){ 
+            //updates progress bar
             $('#slider').slider('value',current);
+            
+            //update furthest time bar
+            if (current > furthestpoint) {
+                furthestpoint=current;
+                var percentage = (furthestpoint)/endTime * 100;
+                $('.tick').css('width',percentage+'%');
+            }
+            
+            //updates time display
             var secondsPassed=parseFloat(current);
             root.find('.time').html(secondsToTimestamp(secondsPassed));
-            
             root.find('#totalTime').html(secondsToTimestamp(secondsPassed)+" / ");
             root.find('#totalTime').append(secondsToTimestamp(endTime));
             
-            //update furthest time bar
-            var percentage = (furthestpoint)/endTime * 100;
-            $('.tick').css('width',percentage+'%');
-            $('.tick').css('left', '0%');//percentage + '%');
-            
+            //updates localstorage
+            var local = { 'currentTime': parseFloat(current), 
+                         'furthestPoint': parseFloat(furthestpoint)};
+            localStorage[datafile]=JSON.stringify(local);
         }
     }
     
@@ -698,12 +700,12 @@ var Grapher = function() {
     *   triggered when user uses scrolling to zoom
     *   currently over-modularized in case we want zoom slider back
     *************************/
-    function zoomStart() {
+    function zoomStart() { // originally called on zoom slider start
         previousX = translateX;
         previousY = translateY;
         previousZoom = totalZoom;
     }
-    function zooming(event, ui) {
+    function zooming(event, ui) { // originally called on zoom slider slide
         totalZoom = Math.max(minZoom, Math.min(ui.value, maxZoom));
         displayZoom(totalZoom);
         
@@ -1283,8 +1285,10 @@ var Grapher = function() {
     *************************/
     function setFullscreenMode(on) {
         fullscreenMode = on;
-        if(on)  root[0].requestFullScreen();
-        else    document.cancelFullScreen();
+        try {
+            if(on)  root[0].requestFullScreen();
+            else    document.cancelFullScreen();
+        } catch(e) {}
         root.find('#fullscreen').find('img').attr('src', fullscreenMode?"images/exitfs.png":"images/fs.png");
         root.find('#fullscreen').attr('title', fullscreenMode?'Exit Fullscreen (ESC)':'Fullscreen (F)');
         root.find('.help').css('visibility',fullscreenMode?'hidden':'visible');
@@ -1408,7 +1412,6 @@ var Grapher = function() {
         var t=getURLParameter('t',location.search);
         var end=getURLParameter('end',location.search);
         embedded = getURLParameter('embed',location.search)==1;
-        console.log(filename,t,end);
         
         datafile="lectures/"+filename+".lec";
         audioSource="lectures/"+filename+".mp3";
@@ -1446,11 +1449,7 @@ var Grapher = function() {
         });
         
         
-        /*************************
-        *
-        *   FETCH AND PROCESS DATA
-        *
-        *************************/
+        // FETCH AND PROCESS THE DATA
         readFile(datafile,getData);
         
         // playback controls
@@ -1705,7 +1704,6 @@ var Grapher = function() {
                 root.find('#screenshotURL').click();
             if(keyCode===76) // l
                 root.find('#timeStampURL').click();
-            console.log(keyCode);
         });
         $(document).on('keydown',function(event){ // for keys which can be pressed and held
             var keyCode = event.keyCode || event.which;

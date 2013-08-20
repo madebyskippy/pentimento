@@ -1392,7 +1392,7 @@ var Grapher = function() {
         + "     <li>Shift-Scroll to zoom</li>"
         + "     <li>Shift-Arrow Key to pan faster</li>"
         + "     <li>Keyboard shortcuts appear on hover</li>"
-        + "</ul></div>"
+        + "</ul><button id='closeDialog'>OK</button></div>"
         + "</div>"
     ;
     
@@ -1589,16 +1589,14 @@ var Grapher = function() {
         // about modal dialog
         $('#description-dialog').dialog({
             autoOpen: false,
-            modal: true,
-            buttons: {
-                OK: function() {
-                    $(this).dialog('close');
-                }
-            }
+            modal: true
         });
         $('.ui-dialog-titlebar').hide();
         $('.help').on('click',function(){
             $('#description-dialog').dialog('open');
+        });
+        $('#closeDialog').on('click',function(){
+            $('#description-dialog').dialog('close');
         });
         
         

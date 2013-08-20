@@ -240,25 +240,25 @@ var Grapher = function() {
         
         // set player according to localstorage
         if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
-            var newTransform = getTransform(currentTime);
-            totalZoom = newTransform.m11;
-            translateX = newTransform.tx;
-            translateY = newTransform.ty;
-            displayZoom(totalZoom);
-            clearFrame();
-            changeSlider(currentTime);
-            var percentage = (furthestpoint)/endTime * 100;
-            $('.tick').css('width',percentage+'%');
-            oneFrame(currentTime);
             if(audio.readyState === 4)
-                audio.currentTime=currentTime;
+                audioReady();
             else {
                 audio.addEventListener('canplay', function() {
-                    audio.currentTime=currentTime;
+                    audioReady();
                 });
             }
         }
 
+    }
+    function audioReady() {
+        audio.currentTime = currentTime;
+        displayZoom(totalZoom);
+        setFreePosition(freePosition);
+        changeSlider(currentTime);
+        var percentage = (furthestpoint)/endTime * 100;
+        $('.tick').css('width',percentage+'%');
+        clearFrame();
+        oneFrame(currentTime);
     }
 
     /*************************
@@ -656,8 +656,9 @@ var Grapher = function() {
             root.find('#totalTime').append(secondsToTimestamp(endTime));
             
             //updates localstorage
-            var local = { 'currentTime': parseFloat(current), 
-                         'furthestPoint': parseFloat(furthestpoint)};
+            var local = {'currentTime': parseFloat(current), 
+                         'furthestPoint': parseFloat(furthestpoint),
+                         'tx': translateX, 'ty': translateY, 'tz': totalZoom, 'free': freePosition};
             localStorage[datafile]=JSON.stringify(local);
         }
     }
@@ -1425,6 +1426,7 @@ var Grapher = function() {
         var t=getURLParameter('t',location.search);
         var end=getURLParameter('end',location.search);
         embedded = getURLParameter('embed',location.search)==1;
+        var tm = JSON.parse(getURLParameter('tm',location.search));
         
         datafile="lectures/"+filename+".lec";
         audioSource="lectures/"+filename+".mp3";
@@ -1470,7 +1472,7 @@ var Grapher = function() {
         $('.buttons').append('<button class="slowDown"></button>');
         $('.buttons').append('<button class="speedUp"></button>');
         $('.controls').append('<div class="speedDisplay"></div>');
-        $('.buttons').append('<button class="help"></button>');
+        $('.buttons').append('<button class="help" title="About"></button>');
         
         $('#slider').slider({
             max:100,
@@ -1507,8 +1509,12 @@ var Grapher = function() {
         sideButtons.append('<button class="transBtns" id="zoomOut" title="Zoom Out (-)"><img src="images/minus.png"></img></button>');
         sideButtons.append('<button class="transBtns" id="fullscreen" title="Fullscreen (F)"><img src="images/fs.png"></img></button>');
         sideButtons.append('<button class="transBtns" id="screenshotURL" title="Screenshot (S)"><img src="images/camera.png"></img></button>');
-        sideButtons.append('<button class="transBtns" id="timeStampURL" title="Link of video at current time (L)"><img src="images/link.png"></img></button>');
-        sideButtons.append(" <div class='URLinfo'>Link to the lecture at the current time: <br/><textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea></div>");
+        sideButtons.append('<button class="transBtns" id="timeStampURL" title="State-saved URL or Embed Code (L)"><img src="images/link.png"></img></button>');
+        sideButtons.append("<div class='URLinfo'>"+
+                           "<button id='linkbutton'>Link at current time and transform</button> "+
+                           "<button id='embedbutton'>Embed</button><br/>"+
+                           "<textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea>"+
+                           "</div>");
         
         $('#revertPos').on('click', function () {
             setFreePosition(false);
@@ -1539,9 +1545,30 @@ var Grapher = function() {
             } else {
                 $('.URLinfo').css('visibility','hidden');
             }
+            $('#linkbutton').click();
+        });
+        $('#linkbutton').on('click',function(){
+            $(this).attr('disabled',true);
+            $('#embedbutton').attr('disabled',false);
             var url = window.location.origin + window.location.pathname
             url = url + '?n='+ getURLParameter('n',location.search);
-            $('.URLs').val(url+'&t='+Math.round(currentTime*100)/100);
+            $('.URLs').val(url+'&t='+Math.round(currentTime*100)/100+
+                           '&tm='+JSON.stringify([
+                               Math.round(translateX*100)/100,
+                               Math.round(translateY*100)/100,
+                               Math.round(totalZoom*100)/100,
+                               freePosition?1:0
+                           ]));
+            $('.URLs').select();
+        });
+        $('#embedbutton').on('click',function(){
+            $(this).attr('disabled',true);
+            $('#linkbutton').attr('disabled',false);
+            var url = window.location.origin + window.location.pathname
+            url = url + '?n='+ getURLParameter('n',location.search);
+            $('.URLs').val('<iframe src="'+url+
+                           '" width=510 height=400 frameborder=1 '+
+                           'allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe>');
             $('.URLs').select();
         });
         
@@ -1606,7 +1633,8 @@ var Grapher = function() {
             down: function(e) {
                 if(e.target === canvas)
                     mouseDown(e);
-                if(e.target !== $('.URLinfo')[0] & e.target !== $('.URLs')[0])
+                if(e.target !== $('.URLinfo')[0] & e.target !== $('.URLs')[0] &
+                   e.target !== $('#linkbutton')[0] & e.target !== $('#embedbutton')[0])
                     $('.URLinfo').css('visibility','hidden');
             },
             move: mouseMove,
@@ -1732,10 +1760,20 @@ var Grapher = function() {
             var local=JSON.parse(localStorage[datafile]);
             currentTime=local.currentTime;
             furthestpoint=local.furthestPoint;
+            translateX=local.tx;
+            translateY=local.ty;
+            totalZoom=local.tz;
+            freePosition=local.free;
         }
         // then check data from URL
         if (t != -100) {
             currentTime=t;
+        }
+        if( tm != -100) {
+            translateX=tm[0];
+            translateY=tm[1];
+            totalZoom=tm[2];
+            freePosition=tm[3]===1;
         }
         
         $(window).on('resize',resizeVisuals);

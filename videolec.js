@@ -1539,6 +1539,7 @@ var Grapher = function() {
             animateZoom(Math.max(totalZoom*2/3,minZoom));
         });
         
+        //URL generators
         var url = (location.origin || (location.protocol+'//'+location.host)) + location.pathname
         url = url + '?n='+ getURLParameter('n',location.search);
         $('#timeStampURL').on('click',function(){
@@ -1613,6 +1614,7 @@ var Grapher = function() {
             if(key === 16 & !shiftKeyPressed) {
                 dragToPan = false;
                 shiftKeyPressed = true;
+                $('.video').addClass('zooming');
             }
         });
         window.addEventListener('keyup', function(e) {
@@ -1620,6 +1622,7 @@ var Grapher = function() {
             if(key === 16) {
                 dragToPan = true;
                 shiftKeyPressed = false;
+                $('.video').removeClass('zooming');
             }
         });
         
@@ -1669,13 +1672,19 @@ var Grapher = function() {
                 var scroll = e.wheelDeltaY;
                 if(e.shiftKey)
                     scroll = e.wheelDeltaX;
+                if(scroll === undefined)
+                    scroll = e.wheelDelta;
                 if(scroll !== 0) {
                     zoomStart();
                     zooming('trash', {value: totalZoom+0.1*scroll/Math.abs(scroll)});
                 }
             }
-            else
-                pan(e.wheelDeltaX, e.wheelDeltaY);
+            else {
+                if(e.wheelDeltaX === undefined)
+                    pan(0, e.wheelDelta);
+                else
+                    pan(e.wheelDeltaX, e.wheelDeltaY);
+            }
         });
            
         // play/pause button controls audio playback

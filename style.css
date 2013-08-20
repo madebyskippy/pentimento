@@ -16,6 +16,10 @@ body{
     cursor: default;
     background-color: #fff;
 }
+.video.zooming{
+    cursor: url('images/magnify.cur'), -webkit-zoom-in;
+    cursor: url('images/magnify.cur'), -moz-zoom-in;
+}
 
 .lecture{
     margin: auto auto;

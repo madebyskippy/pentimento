@@ -1509,9 +1509,9 @@ var Grapher = function() {
         sideButtons.append('<button class="transBtns" id="zoomOut" title="Zoom Out (-)"><img src="images/minus.png"></img></button>');
         sideButtons.append('<button class="transBtns" id="fullscreen" title="Fullscreen (F)"><img src="images/fs.png"></img></button>');
         sideButtons.append('<button class="transBtns" id="screenshotURL" title="Screenshot (S)"><img src="images/camera.png"></img></button>');
-        sideButtons.append('<button class="transBtns" id="timeStampURL" title="State-saved URL or Embed Code (L)"><img src="images/link.png"></img></button>');
+        sideButtons.append('<button class="transBtns" id="timeStampURL" title="Link and Code (L)"><img src="images/link.png"></img></button>');
         sideButtons.append("<div class='URLinfo'>"+
-                           "<button id='linkbutton'>Link at current time and transform</button> "+
+                           "<button id='linkbutton'>State-saved URL</button> "+
                            "<button id='embedbutton'>Embed</button><br/>"+
                            "<textarea class='URLs' readonly='readonly' rows='1' cols='35' wrap='off'></textarea>"+
                            "</div>");
@@ -1539,6 +1539,8 @@ var Grapher = function() {
             animateZoom(Math.max(totalZoom*2/3,minZoom));
         });
         
+        var url = (location.origin || (location.protocol+'//'+location.host)) + location.pathname
+        url = url + '?n='+ getURLParameter('n',location.search);
         $('#timeStampURL').on('click',function(){
             if ( $('.URLinfo').css('visibility')=='hidden'){
                 $('.URLinfo').css('visibility','visible');
@@ -1550,8 +1552,6 @@ var Grapher = function() {
         $('#linkbutton').on('click',function(){
             $(this).attr('disabled',true);
             $('#embedbutton').attr('disabled',false);
-            var url = window.location.origin + window.location.pathname
-            url = url + '?n='+ getURLParameter('n',location.search);
             $('.URLs').val(url+'&t='+Math.round(currentTime*100)/100+
                            '&tm='+JSON.stringify([
                                Math.round(translateX*100)/100,
@@ -1564,9 +1564,7 @@ var Grapher = function() {
         $('#embedbutton').on('click',function(){
             $(this).attr('disabled',true);
             $('#linkbutton').attr('disabled',false);
-            var url = window.location.origin + window.location.pathname
-            url = url + '?n='+ getURLParameter('n',location.search);
-            $('.URLs').val('<iframe src="'+url+
+            $('.URLs').val('<iframe src="'+url+'&embed=1'+
                            '" width=510 height=400 frameborder=1 '+
                            'allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe>');
             $('.URLs').select();

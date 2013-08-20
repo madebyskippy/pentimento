@@ -2,6 +2,8 @@ var Grapher = function() {
     exports = {};
     var canvas; //the canvas
     var context;
+//    var pdfCanvas;
+//    var pdfContext;
     
     var root, controls;
     
@@ -213,6 +215,12 @@ var Grapher = function() {
         $('.loadingMsg').remove();
         resizeVisuals();
         
+//        pdfCanvas = document.createElement('canvas');
+//        pdfCanvas.width = boundingRect.width*maxZoom;
+//        pdfCanvas.height = boundingRect.height*maxZoom;
+//        pdfContext = pdfCanvas.getContext('2d');
+//        pdfContext.drawSvg('http://web.mit.edu/lu16j/www/Advising_Choice_Confirmation.svg', 0 , 0, pdfCanvas.width, pdfCanvas.height);
+        
         return json;
     }
     
@@ -384,6 +392,11 @@ var Grapher = function() {
         translateX = Math.min(Math.max(translateX,canvas.width-boundingRect.xmax*xscale*totalZoom),-boundingRect.xmin*xscale*totalZoom);
         translateY = Math.min(Math.max(translateY,canvas.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
+        
+//        if(pdfCanvas !== undefined) {
+//            var ratio = canvas.width/pdfCanvas.width;
+//            context.drawImage(pdfCanvas,translateX,translateY,canvas.width*totalZoom,pdfCanvas.height*ratio*totalZoom);
+//        }
         
         // Draw scrollbars when appropriate
         if((audio.paused | freePosition | hoveringOverScrollbars) & totalZoom !== minZoom & !isScreenshot) {
@@ -1415,7 +1428,7 @@ var Grapher = function() {
         
         datafile="lectures/"+filename+".lec";
         audioSource="lectures/"+filename+".mp3";
-        
+        $(document).find('title').html(filename);
         
         // set up audio
         

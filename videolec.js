@@ -1412,8 +1412,8 @@ var Grapher = function() {
         + "     <ul><li>Click on a stroke to go to that point in the video</li>"
         + "     <li>Drag, scroll, or use arrow keys to pan around</li>"
         + "     <li>Shift-Scroll to zoom</li>"
+        + "     <li>Double-click to zoom</li>"
         + "     <li>Shift-Arrow Key to pan faster</li>"
-        + "     <li>Keyboard shortcuts appear on hover</li>"
         + "</ul><button id='closeDialog'>OK</button></div>"
         + "</div>"
     ;

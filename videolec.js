@@ -1355,11 +1355,15 @@ var Grapher = function() {
     /*************************
     *
     *   animated zoom when using side buttons
-    *
+    *   zooms in on point (cx,cy), defaults to center screen
     *************************/
-    function animateZoom(nz) {
-        var nx = translateX + (1-nz/totalZoom)*(canvas.width/2-translateX);
-        var ny = translateY + (1-nz/totalZoom)*(canvas.height/2-translateY);
+    function animateZoom(nz, cx, cy) {
+        if(cx === undefined)
+            cx = canvas.width/2;
+        if(cy === undefined)
+            cy = canvas.height/2;
+        var nx = translateX + (1-nz/totalZoom)*(cx-translateX);
+        var ny = translateY + (1-nz/totalZoom)*(cy-translateY);
         setFreePosition(true);
         animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
     }
@@ -1643,23 +1647,11 @@ var Grapher = function() {
             double: function(e, target) {
                 if(target === canvas) {
                     setFreePosition(true);
-                    
-                    var x = e.pageX,
-                        y = e.pageY;
+                    var x = e.pageX-offset.left,
+                        y = e.pageY-offset.top;
                     mousePressed = false;
                     var nz = totalZoom===1?2:1;
-                    if(nz === 2) {
-                        previousX = x-canvas.width/2/nz;
-                        previousY = y-canvas.height/2/nz;
-                    }
-                    else {
-                        previousX = x>canvas.width/2?-canvas.width:0;
-                        previousY = y>canvas.height/2?-canvas.height:0;
-                    }
-                    var nx = -(previousX - offset.left - translateX)/totalZoom*nz;
-                    var ny = -(previousY - offset.top - translateY)/totalZoom*nz;
-                    
-                    animateToPos(Date.now(), 500, translateX, translateY, totalZoom, nx, ny, nz);
+                    animateZoom(nz, x, y);
                 }
             },
             tolerance: 200

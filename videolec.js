@@ -669,8 +669,12 @@ var Grapher = function() {
             
             //updates localstorage
             var local = {'currentTime': parseFloat(current), 
-                         'furthestPoint': parseFloat(furthestpoint),
-                         'tx': translateX, 'ty': translateY, 'tz': totalZoom, 'free': freePosition};
+                         'furthestPoint': parseFloat(furthestpoint)};
+            if(freePosition) {
+                local.tx = translateX;
+                local.ty = translateY;
+                local.tz = totalZoom;
+            }
             localStorage[datafile]=JSON.stringify(local);
         }
     }
@@ -1572,12 +1576,12 @@ var Grapher = function() {
             $(this).attr('disabled',true);
             $('#embedbutton').attr('disabled',false);
             $('.URLs').val(url+'&t='+Math.round(currentTime*100)/100+
-                           '&tm='+JSON.stringify([
+                           (freePosition?'&tm='+JSON.stringify([
                                Math.round(translateX*100)/100,
                                Math.round(translateY*100)/100,
                                Math.round(totalZoom*100)/100,
                                freePosition?1:0
-                           ]));
+                           ]):''));
             $('.URLs').select();
         });
         $('#embedbutton').on('click',function(){
@@ -1771,10 +1775,12 @@ var Grapher = function() {
             var local=JSON.parse(localStorage[datafile]);
             currentTime=local.currentTime;
             furthestpoint=local.furthestPoint;
-            translateX=local.tx;
-            translateY=local.ty;
-            totalZoom=local.tz;
-            freePosition=local.free;
+            if(local.tx !== undefined) {
+                translateX=local.tx;
+                translateY=local.ty;
+                totalZoom=local.tz;
+                freePosition=true;
+            }
         }
         // then check data from URL
         if (t != -100) {
@@ -1784,7 +1790,7 @@ var Grapher = function() {
             translateX=tm[0];
             translateY=tm[1];
             totalZoom=tm[2];
-            freePosition=tm[3]===1;
+            freePosition=true;
         }
         
         $(window).on('resize',resizeVisuals);

@@ -1192,6 +1192,8 @@ var Grapher = function() {
         $('.onScreenStatus').css('visibility',"hidden");
         
         var sideIncrement = fullscreenMode?canvas.height/7:canvas.height/6;
+        if(sideIncrement*2 > windowWidth-canvas.width)
+            $('.lecture').css('margin',0);
         var transBtnDim = sideIncrement/2;
         $('.sideButtons').css({top: (offset.top),
                                left: (fullscreenMode?windowWidth-sideIncrement-2:offset.left+canvas.width+(embedded?0:10)),

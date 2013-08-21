@@ -2,8 +2,12 @@ var Grapher = function() {
     exports = {};
     var canvas; //the canvas
     var context;
-//    var pdfCanvas;
-//    var pdfContext;
+    /***
+    *   FOR PDF RENDERING
+    *   -----------------
+    *   var pdfCanvas;
+    *   var pdfContext;
+    ***/
     
     var root, controls;
     
@@ -61,17 +65,17 @@ var Grapher = function() {
     *   Clean up and optimize data for playback
     *
     *************************/
-    function preProcess(json) {
-        boundingRect.xmax = json.width;
-        boundingRect.ymax = json.height;
+    function preProcess(callback) {
+        boundingRect.xmax = dataArray.width;
+        boundingRect.ymax = dataArray.height;
         
         //for counting overall reduction
         var origVertices = 0;
         var finalVertices = 0;
         
-        for(k in json.visuals) {
+        for(k in dataArray.visuals) {
             //translate colors to RGB values
-            var properties = json.visuals[k].properties;
+            var properties = dataArray.visuals[k].properties;
             for(p in properties) {
                 var property = properties[p];
                 property.red = Math.round(parseFloat(property.red)*255);
@@ -84,10 +88,10 @@ var Grapher = function() {
             }
             
             //get bounding box, invert y-coordinates
-            var stroke = json.visuals[k].vertices;
+            var stroke = dataArray.visuals[k].vertices;
             for(j in stroke) {
                 var point = stroke[j];
-                point.y = json.height-point.y;
+                point.y = dataArray.height-point.y;
                 if(point.x < boundingRect.xmin) boundingRect.xmin = point.x;
                 if(point.x > boundingRect.xmax) boundingRect.xmax = point.x;
                 if(point.y < boundingRect.ymin) boundingRect.ymin = point.y;
@@ -165,8 +169,8 @@ var Grapher = function() {
         
         // divide stroke into similar-direction
         // polygons for calligraphy
-        for(var i=0; i<json.visuals.length; i++) {
-            var visual = json.visuals[i],
+        for(var i=0; i<dataArray.visuals.length; i++) {
+            var visual = dataArray.visuals[i],
                 stroke = visual.vertices;
             
             // use law of cosines to find when
@@ -195,33 +199,32 @@ var Grapher = function() {
         
         // invert y transforms, 
         // set max/min zooms and bounding box based on transforms
-        for(i in json.cameraTransforms) {
-            var transform = json.cameraTransforms[i];
+        for(i in dataArray.cameraTransforms) {
+            var transform = dataArray.cameraTransforms[i];
             transform.ty = -transform.ty;
             if(transform.m11 > maxZoom) maxZoom = transform.m11;
             if(transform.m11 < minZoom) minZoom = transform.m11;
             if(-transform.tx < boundingRect.xmin) boundingRect.xmin = -transform.tx;
-            if(-transform.tx > boundingRect.xmax - json.width) boundingRect.xmax = json.width-transform.tx;
+            if(-transform.tx > boundingRect.xmax - dataArray.width) boundingRect.xmax = dataArray.width-transform.tx;
             if(-transform.ty < boundingRect.ymin) boundingRect.ymin = -transform.ty;
-            if(-transform.ty > boundingRect.ymax - json.height) boundingRect.ymax = json.height-transform.ty;
+            if(-transform.ty > boundingRect.ymax - dataArray.height) boundingRect.ymax = dataArray.height-transform.ty;
         }
         boundingRect.width = boundingRect.xmax - boundingRect.xmin;
         boundingRect.height = boundingRect.ymax - boundingRect.ymin;
-        minZoom = Math.min(json.width/boundingRect.width,json.height/boundingRect.height);
-        numStrokes=json.visuals.length;
+        minZoom = Math.min(dataArray.width/boundingRect.width,dataArray.height/boundingRect.height);
+        numStrokes=dataArray.visuals.length;
         
-        // done loading, show player
-        $('.lecture').show();
-        $('.loadingMsg').remove();
-        resizeVisuals();
+        callback();
         
-//        pdfCanvas = document.createElement('canvas');
-//        pdfCanvas.width = boundingRect.width*maxZoom;
-//        pdfCanvas.height = boundingRect.height*maxZoom;
-//        pdfContext = pdfCanvas.getContext('2d');
-//        pdfContext.drawSvg('http://web.mit.edu/lu16j/www/Advising_Choice_Confirmation.svg', 0 , 0, pdfCanvas.width, pdfCanvas.height);
-        
-        return json;
+        /***
+        *   FOR PDF RENDERING
+        *   -----------------
+        *   pdfCanvas = document.createElement('canvas');
+        *   pdfCanvas.width = boundingRect.width*maxZoom;
+        *   pdfCanvas.height = boundingRect.height*maxZoom;
+        *   pdfContext = pdfCanvas.getContext('2d');
+        *   pdfContext.drawSvg([svgpath], [topleftx], [toplefty], [width], [height]);
+        ***/
     }
     
     /*************************
@@ -236,19 +239,24 @@ var Grapher = function() {
         ymax=dataArray.height;
         $('#slider').slider("option","max",endTime);
         $('#totalTime').html("0:00 / "+secondsToTimestamp(endTime));
-        dataArray = preProcess(dataArray);
-        
-        // set player according to localstorage
-        if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
-            if(audio.readyState === 4)
-                audioReady();
-            else {
-                audio.addEventListener('canplay', function() {
+        // process dataArray then do things
+        preProcess(function() {
+            // done loading, show player
+            $('.lecture').show();
+            $('.loadingMsg').remove();
+            resizeVisuals();
+            
+            // set player according to localstorage
+            if (localStorage[datafile]!==undefined & localStorage[datafile]!=='undefined'){
+                if(audio.readyState === 4)
                     audioReady();
-                });
+                else {
+                    audio.addEventListener('canplay', function() {
+                        audioReady();
+                    });
+                }
             }
-        }
-
+        });
     }
     function audioReady() {
         audio.currentTime = currentTime;
@@ -393,10 +401,14 @@ var Grapher = function() {
         translateY = Math.min(Math.max(translateY,canvas.height-boundingRect.ymax*yscale*totalZoom),-boundingRect.ymin*yscale*totalZoom);
         totalZoom = Math.min(maxZoom, Math.max(totalZoom, minZoom));
         
-//        if(pdfCanvas !== undefined) {
-//            var ratio = canvas.width/pdfCanvas.width;
-//            context.drawImage(pdfCanvas,translateX,translateY,canvas.width*totalZoom,pdfCanvas.height*ratio*totalZoom);
-//        }
+        /***
+        *   FOR PDF RENDERING
+        *   -----------------
+        *   if(pdfCanvas !== undefined) {
+        *       var ratio = canvas.width/pdfCanvas.width;
+        *       context.drawImage(pdfCanvas,translateX,translateY,canvas.width*totalZoom,pdfCanvas.height*ratio*totalZoom);
+        *   }
+        ***/
         
         // Draw scrollbars when appropriate
         if((audio.paused | freePosition | hoveringOverScrollbars) & totalZoom !== minZoom & !isScreenshot) {

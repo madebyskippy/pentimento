@@ -16,9 +16,10 @@ HTML
 ----
 index.html (or desired index page):
 * Include jQuery (js) and generator.js
-* generator.js will create a list of links to every lecture in root/lectures  
+* Insert `<span class=".lec">NAME</span>` for each lecture 
+* generator.js will generate the links  
 
-lecture.html (or desired video player base page) - similar to youtube.com/watch:  
+lecture.html - similar to youtube.com/watch:  
 * Include jQuery (js) and jQueryUI (js and css)
 * Define a div with class name "pentimento"
 * Include videolec.js after div.pentimento
@@ -28,7 +29,7 @@ Structures
 ==========
 URL
 ---
-RootPage.com/BasePage.html?n=<b>FILENAME</B>&t=<b>TIMESTAMP</b>&end=<b>ENDTIME</b>&tm=<b>TRANSFORM</b>  
+RootPage.com/lecture.html?n=<b>FILENAME</B>&t=<b>TIMESTAMP</b>&end=<b>ENDTIME</b>&tm=<b>TRANSFORM</b>  
 * filename: name of the lecture file (lecture1 for lecture1.lec/.mp3/.ogg)
 * timestamp (optional): time to seek to on load
 * endtime (optional, not used yet): specify end point of lecture segment, if only a specific part needs to be watched

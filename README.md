@@ -7,7 +7,7 @@ setup
 =====
 Files
 -----
-Root folder must contain all .js, .css, and .html files from repo  
+Root folder must contain all .js, .css, and .html files  
 Images must be in root/images subfolder  
 Lecture and audio files (.lec, .mp3, .ogg) must be in root/lectures subfolder  
 .lec and .mp3/.ogg files should have the same filename (lecture1.lec, lecture1.mp3, lecture1.ogg)  
@@ -145,6 +145,7 @@ Playback
 * Animation uses quintic easing  
 * Camera transform linearly interpolated from timestamped data transforms  
 * Lower bound on size: 400px wide  
+* Saves current timestamp and transform in localStorage  
 
 Data Preprocessing
 ------------------

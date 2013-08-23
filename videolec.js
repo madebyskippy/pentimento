@@ -1779,7 +1779,7 @@ var Grapher = function() {
                 translateX=local.tx;
                 translateY=local.ty;
                 totalZoom=local.tz;
-                freePosition=true;
+                setFreePosition(true);
             }
         }
         // then check data from URL
@@ -1790,7 +1790,7 @@ var Grapher = function() {
             translateX=tm[0];
             translateY=tm[1];
             totalZoom=tm[2];
-            freePosition=true;
+            setFreePosition(true);
         }
         
         $(window).on('resize',resizeVisuals);
